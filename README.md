@@ -3,6 +3,8 @@
 An open source macOS app for running Windows games on Apple silicon — MIT-licensed, with a
 GUI, so none of it takes a terminal.
 
+![The library window: a bottle in the sidebar with the titles in it, one selected, with a Play button and the arguments it starts with](assets/library.png)
+
 ## Status
 
 Playing here now:
@@ -106,7 +108,7 @@ unmounts it again. See `docs/licensing.md`.
 | `Sources/sake/` | the SwiftUI app — two windows, kept thin |
 | `patches/` | the changes sake makes to Wine's own code — LGPL-2.1-or-later, not MIT; `patches/README.md` says where each came from |
 | `docs/` | how the thing actually has to work, and what breaks when it doesn't |
-| `assets/` | the app icon, and the code that draws it |
+| `assets/` | the app icon, the code that draws it, and the screenshot above |
 | `scripts/build-app.sh` | builds `target/Sake.app` |
 | `scripts/make-icon.sh` | redraws `assets/Sake.icns` |
 | `scripts/test.sh` | runs the tests |
