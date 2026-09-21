@@ -303,6 +303,14 @@ about the token.
 Implication for sake: a "launch the game directly" button cannot work for this title on its
 own. The launcher's own flow has to be driven at least once per session.
 
+**There is a third way in that nobody here has tried.** Blizzard installs its own
+`Diablo IV Launcher.exe` beside the game, and the desktop shortcut the installer leaves
+points at that with no arguments at all — read out of
+`drive_c/users/Public/Desktop/Diablo IV.lnk` on 2026-09-21, 250 bytes, target and working
+directory and nothing else. So "start Diablo IV" as a title in sake need not mean starting
+`Diablo IV.exe`: it can mean starting the launcher Blizzard ships, which talks to the
+client the way the Play button does. **Untested** — the shortcut was read, not run.
+
 ## Controllers need SDL2
 
 `winebus.sys` has two backends. **IOHID** is built either way and handles anything behaving

@@ -111,7 +111,9 @@ patches in `patches/`. `runtime.md` has the measurement and what to look for.
 What the second title taught about profiles: Steam needed **nothing** per-title once the
 engine could host a swapchain across processes — no flags, no environment, no registry. The
 three Chromium flags sake offers are Battle.net's, measured on its 32-bit CEF, and Steam's
-client cannot even take them. So a title profile is still name, executable and arguments,
+client cannot even take them. So a title profile was name, executable and arguments until
+2026-09-21, when it gained an environment of its own — `runtime.md` has what that may and
+may not set —
 and the argument suggestion is a heuristic for one launcher rather than a rule for Chromium.
 Nothing yet knows that starting Diablo IV directly fails on the token — `runtime.md` says
 so, the app does not.
@@ -279,7 +281,17 @@ easier to read than it was interleaved with `configure` flags.
   after an uninstall are all judgements, and all in the app target — `scripts/test.sh` only
   reaches `SakeKit`. `CLAUDE.md` says logic in a view stops being tested; this is the same
   thing one layer down. Either these move behind types that do not know about SwiftUI, or
-  the app target gets tests of its own.
+  the app target gets tests of its own. `typedEnvironment()`, added 2026-09-21, is another
+  of these: which variable names a title may not set is a judgement, and it lives in the app
+  target where the tests cannot reach it.
+- **Two buttons say "Check Again" in the setup wizard.** The bottom bar adds one when the
+  step is the machine step, and `primary` adds another because that step is not done, so
+  both render the same verb. The comment above the first says it is there for the step
+  "worth repeating after it has passed" — which is the condition the code does not check.
+  Found 2026-09-21, not fixed.
+- **Editing a title moves it to the end of the sidebar.** `TitleStore.add()` filters the id
+  out and appends, so saving Options reorders the library. Harmless and confusing, and it
+  cost a measurement on 2026-09-21: a row addressed by index was no longer the row it was.
 - **Where the CrossOver version lives.** It is a knob users may need — a newer CrossOver may
   fix or break a given game — but exposing it invites them to pick a combination nobody has
   run. Steam gave the knob a concrete reason on 2026-09-20: two of sake's patches are
