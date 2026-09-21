@@ -33,6 +33,10 @@ message** — it carries the prefix and it is what release-please reads. The bod
 pull request becomes the body of the commit, so what belongs in one belongs in the other,
 and the commits on the branch are working notes that do not survive.
 
+**A branch carries the prefix of the pull request it becomes** — `feat/…`, `fix/…`,
+`docs/…` — because the branch name is read before a title exists, and it is the only
+thing that says what the branch is for until one does.
+
 ## Package Naming
 
 The bundle identifier is `dev.typester.sake`. **Not `com.typester.*`** — `typester.com` is
