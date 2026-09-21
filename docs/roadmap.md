@@ -199,6 +199,33 @@ running, and a bottle just created does not offer what could be imported into it
 something else surveys — `create` sets `importTarget` after the survey that would have used
 it.
 
+**A bottle hands over Wine's own tools rather than growing settings of its own, from
+2026-09-21.** The Windows version, the DLL overrides, the drives and the audio device are
+winecfg's panels, and what they set is the bottle's registry — which `runtime.md` records as
+being flushed lazily by wineserver, so a copy of it in a SwiftUI form would be a second copy
+that lies. The engine already ships fourteen of these programs; the bottle offers four of
+them, the ones that mean something to a bottle with a game in it: winecfg, regedit, the
+uninstaller and the task manager. The rest are either not useful here or better done on the
+macOS side.
+
+Offered, not recommended. winecfg's Windows-version dropdown can break a game, which is the
+same objection the CrossOver-version knob has in the open questions below: exposing it
+invites a combination nobody has run. The difference is that these are Wine's own surfaces
+and sake reimplementing them would not make them safer, only harder to keep true.
+
+The wineserver a tool starts is not something the rename guard knows about — it asks what
+sake started, which is the narrowness the open question about prefixes already describes.
+Running winecfg therefore does not refuse a rename the way a running game does.
+
+**And one layout trap, found the same day.** A `Text` with
+`.fixedSize(horizontal: false, vertical: true)` in a detail pane makes the pane demand a
+height the window does not have to offer; the demand reaches the `NavigationSplitView`,
+which is laid out taller than the window and centred in it, so the content leaves the
+visible area upwards and the window draws empty while the accessibility tree still reports
+every string. The panes scroll now, which keeps the modifier — it is there so a long value
+wraps instead of being truncated — and bounds what the demand can do. The setup wizard had
+been doing this from the start.
+
 ## The Swift/subprocess boundary
 
 Settled during planning on 2026-09-18, recorded here so it is not relitigated.

@@ -170,12 +170,14 @@ struct LibraryWindow: View {
                     size: model.bottleSizes[name],
                     problem: model.problem(with: name),
                     canImport: !model.importSources.isEmpty,
+                    canRunTools: WineTool.missingPrerequisite(in: bottle) == nil,
                     importCandidates: name == model.importTarget ? model.importCandidates.count : nil,
                     importing: { model.beginImport(into: name) },
                     installing: { model.beginInstall(into: name) },
                     addingTitle: { model.beginAddTitle(into: name) },
                     renaming: { model.beginRename(bottle) },
-                    deleting: { model.isDeletingBottle = true }
+                    deleting: { model.isDeletingBottle = true },
+                    runTool: { model.runTool($0, in: name) }
                 )
             }
         case .none:

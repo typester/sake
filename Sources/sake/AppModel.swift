@@ -661,6 +661,15 @@ final class AppModel {
         return environment
     }
 
+    /// Start one of Wine's own tools in a bottle.
+    ///
+    /// Not tracked as a run: winecfg stays open for as long as somebody wants it, and a
+    /// spinner that never stops is worse than none.
+    func runTool(_ tool: WineTool, in bottle: String) {
+        let bottle = Bottle(paths: paths, name: bottle)
+        Task { await tool.start(in: bottle) }
+    }
+
     /// Only what was added by hand can be taken out of the library, and taking it out
     /// leaves the game where it is: this is a list sake keeps, not the install.
     func isRemovable(_ title: Title, in bottle: String) -> Bool {

@@ -58,7 +58,8 @@ struct TitleDetail: View {
             Spacer(minLength: 0)
         }
         .padding(28)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .scrollableDetail()
     }
 
     private func block(_ heading: String, _ body: String) -> some View {

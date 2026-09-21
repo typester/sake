@@ -13,6 +13,8 @@ struct BottleDetail: View {
     /// Whether there is a CrossOver bottle to import from at all. Without one the sheet can
     /// only say why it cannot work, so the way in is not offered.
     let canImport: Bool
+    /// Whether Wine's own tools can be started in this bottle.
+    let canRunTools: Bool
     /// How many things a CrossOver bottle has that this one does not, or `nil` when that
     /// has not been worked out for this bottle.
     let importCandidates: Int?
@@ -21,6 +23,7 @@ struct BottleDetail: View {
     let addingTitle: () -> Void
     let renaming: () -> Void
     let deleting: () -> Void
+    let runTool: (WineTool) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -47,6 +50,18 @@ struct BottleDetail: View {
                     .controlSize(.large)
                 Button("Delete…", action: deleting)
                     .controlSize(.large)
+                if canRunTools {
+                    // A menu rather than a button each: this row already truncates its
+                    // labels at the window's own minimum width.
+                    Menu("Wine Tools") {
+                        ForEach(WineTool.allCases) { tool in
+                            Button(tool.name) { runTool(tool) }
+                        }
+                    }
+                    .menuStyle(.button)
+                    .controlSize(.large)
+                    .fixedSize()
+                }
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -76,7 +91,8 @@ struct BottleDetail: View {
             Spacer(minLength: 0)
         }
         .padding(28)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .scrollableDetail()
     }
 
     private var holds: String {

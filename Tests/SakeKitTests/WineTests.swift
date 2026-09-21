@@ -325,3 +325,38 @@ private func failure(in events: [WineEvent]) -> (reason: String, log: URL?)? {
     #expect(!FileManager.default.fileExists(atPath: paths.wineBuild.appending(path: "Makefile").path))
     #expect(!builder.isBuilt)
 }
+
+/// Wine's own tools, run in a bottle. The engine ships them as Windows programs under
+/// `lib/wine/x86_64-windows/`, so what starts them is the bare name and nothing else.
+@Test func eachWineToolIsStartedByItsBareNameInTheBottle() throws {
+    let root = FileManager.default.temporaryDirectory.appending(path: "sake-tool-\(UUID().uuidString)")
+    let paths = Paths(root: root.appending(path: "support"), cache: root.appending(path: "cache"))
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let bottle = Bottle(paths: paths)
+    #expect(WineTool.missingPrerequisite(in: bottle)?.contains("Wine is not built") == true)
+
+    try FileManager.default.createDirectory(
+        at: paths.engine.appending(path: "bin"), withIntermediateDirectories: true
+    )
+    try Data().write(to: paths.engine.appending(path: "bin/wine"))
+    // Still no bottle, which is a different sentence from a missing engine.
+    #expect(WineTool.missingPrerequisite(in: bottle)?.contains("no bottle") == true)
+
+    // A bottle is its prefix, and what says the prefix is there is its registry.
+    try FileManager.default.createDirectory(at: bottle.driveC, withIntermediateDirectories: true)
+    try Data().write(to: bottle.systemRegistry)
+    #expect(WineTool.missingPrerequisite(in: bottle) == nil)
+
+    #expect(WineTool.allCases.map(\.rawValue) == ["winecfg", "regedit", "uninstaller", "taskmgr"])
+    for tool in WineTool.allCases {
+        let command = tool.command(in: bottle)
+        #expect(command.executable.lastPathComponent == "wine")
+        #expect(command.arguments == [tool.rawValue])
+        #expect(command.environment?["WINEPREFIX"] == bottle.url.path)
+        #expect(command.workingDirectory?.lastPathComponent == "drive_c")
+        // `arch` would strip every DYLD_* variable, and wine is x86_64 already.
+        #expect(command.architecture == .native)
+        #expect(tool.logURL(in: paths).lastPathComponent == "tool-\(tool.rawValue).log")
+    }
+}
