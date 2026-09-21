@@ -150,7 +150,10 @@ state the detail pane can only show for one title at a time: running, or not ins
 bottle is selectable in its own right rather than only through the games in it — a bottle
 just made has nothing in it, so a heading alone would be a dead end. What the detail pane for
 one offers is how a game gets in: the import, the game's own installer, and adding
-something already there as a title. Those are per-bottle actions and they live on the
+something already there as a title. The import is offered only where there is a CrossOver
+bottle to take from, from 2026-09-21: `CrossOverBottle.available()` already answers that,
+and a button whose sheet can say nothing but why it cannot work is worse than no button.
+Those are per-bottle actions and they live on the
 bottle, which is where they moved on 2026-09-20 — the sidebar's menu keeps only what is
 about the library rather than about one bottle in it.
 

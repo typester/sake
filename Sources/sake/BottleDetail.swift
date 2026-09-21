@@ -10,6 +10,9 @@ struct BottleDetail: View {
     let size: Int64?
     /// What went wrong the last time something was done to it, as a sentence.
     let problem: String?
+    /// Whether there is a CrossOver bottle to import from at all. Without one the sheet can
+    /// only say why it cannot work, so the way in is not offered.
+    let canImport: Bool
     /// How many things a CrossOver bottle has that this one does not, or `nil` when that
     /// has not been worked out for this bottle.
     let importCandidates: Int?
@@ -31,8 +34,10 @@ struct BottleDetail: View {
             }
 
             HStack(spacing: 12) {
-                Button("Import from CrossOver…", action: importing)
-                    .controlSize(.large)
+                if canImport {
+                    Button("Import from CrossOver…", action: importing)
+                        .controlSize(.large)
+                }
                 Button("Install from an Installer…", action: installing)
                     .controlSize(.large)
                 Button("Add a Title…", action: addingTitle)

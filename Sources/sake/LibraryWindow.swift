@@ -15,6 +15,7 @@ enum LibrarySelection: Hashable {
 struct LibraryWindow: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.appearsActive) private var appearsActive
 
     var body: some View {
         @Bindable var model = model
@@ -89,6 +90,11 @@ struct LibraryWindow: View {
         // A survey measures what it can, but clicking from one bottle to the next is not
         // one of the things that causes a survey.
         .onChange(of: model.selectedBottle) { model.measureSelectedBottle() }
+        // A bottle made in CrossOver while sake was in the background: the selection is no
+        // use as a trigger, because one bottle means selectedBottle never changes.
+        .onChange(of: appearsActive) { _, active in
+            if active { model.surveyImportSources() }
+        }
         .task {
             await model.check()
             // First run lands here with nothing built, so the wizard opens itself rather
@@ -163,6 +169,7 @@ struct LibraryWindow: View {
                     titles: model.titles[name] ?? [],
                     size: model.bottleSizes[name],
                     problem: model.problem(with: name),
+                    canImport: !model.importSources.isEmpty,
                     importCandidates: name == model.importTarget ? model.importCandidates.count : nil,
                     importing: { model.beginImport(into: name) },
                     installing: { model.beginInstall(into: name) },

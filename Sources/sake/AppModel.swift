@@ -279,6 +279,13 @@ final class AppModel {
         titleStatus = titleStatus.filter { key, _ in titles[key.bottle]?.contains(key.title) == true }
         measureSelectedBottle()
 
+        surveyImportSources()
+    }
+
+    /// Called from ``survey()`` and again when the selection moves: without the second
+    /// caller a bottle made in CrossOver after sake started stays invisible until a
+    /// relaunch.
+    func surveyImportSources() {
         importSources = CrossOverBottle.available()
         if importSource == nil || !importSources.contains(where: { $0 == importSource }) {
             importSource = importSources.first
@@ -291,7 +298,6 @@ final class AppModel {
             importCandidates = []
             importBlockedBy = "No CrossOver bottle to import from."
         }
-
     }
 
     private func isStillThere(_ selection: LibrarySelection?) -> Bool {
