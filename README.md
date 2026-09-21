@@ -30,7 +30,8 @@ at a time:
 6. put a game in it — its own installer, the one you downloaded, runs inside the bottle
 
 After that the library is where you live. A bottle holds titles you added; a title is a
-program in that bottle, its name, and the arguments it starts with. Picking a program that
+program in that bottle, its name, the arguments it starts with and any environment of its
+own. Picking a program that
 carries `libcef.dll` fills those arguments in with what a Chromium client needs, because
 that is the one thing this stack is known to require and easy to forget. A title's name and
 arguments can be changed afterwards, a bottle can be renamed or thrown away, and the app

@@ -96,7 +96,8 @@ after `~/.wine`, kills nothing of the user's and exits 0.
 ### Which is why the titles added by hand live in the prefix
 
 `sake-titles.json`, at the root of the bottle, holds what somebody added to the library
-themselves — a name, the arguments, and the executable **relative to `drive_c`**. Nothing
+themselves — a name, the arguments, the environment, and the executable **relative to
+`drive_c`**. Nothing
 in it names the prefix, so it inherits everything the section above measured: a rename
 stays a `moveItem`, and throwing the bottle away takes its titles with it. Keeping the
 list under `~/Library/Sake` instead would make both of those an operation on two places
@@ -105,6 +106,11 @@ that have to agree, which is the shape of bug that outlives the feature. Added 2
 Wine ignores what it does not recognise at a prefix's root — it keeps its own
 `.update-timestamp` there — and a bottle nobody has added anything to has no
 `sake-titles.json` at all.
+
+**A field added to that file has to be optional going in.** `TitleStore.load()` turns any
+decoding failure into an empty list rather than an error, so a required field would empty
+the library of every bottle written before it existed, with nothing said. `environment`
+was added that way on 2026-09-21 and the tests pin it.
 
 **This file is the whole of it.** sake has no titles of its own to merge with: a bottle
 shows what somebody added to it and nothing else, so the file is the answer rather than one
