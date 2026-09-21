@@ -47,7 +47,12 @@ public struct TitleStore: Sendable {
     ///
     /// The executable is stored relative to `drive_c`, which is what lets the bottle be
     /// renamed or moved with the titles still pointing at something.
-    public func title(at executable: URL, named typed: String, arguments: [String] = []) throws -> Title {
+    public func title(
+        at executable: URL,
+        named typed: String,
+        arguments: [String] = [],
+        environment: [String: String] = [:]
+    ) throws -> Title {
         let name = typed.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { throw TitleStoreError.unnamed }
 
@@ -55,7 +60,13 @@ public struct TitleStore: Sendable {
         guard FileManager.default.fileExists(atPath: executable.path) else {
             throw TitleStoreError.notThere(executable.path)
         }
-        return Title(id: identifier(for: name), name: name, executable: relative, arguments: arguments)
+        return Title(
+            id: identifier(for: name),
+            name: name,
+            executable: relative,
+            arguments: arguments,
+            environment: environment
+        )
     }
 
     public func add(_ title: Title) throws {

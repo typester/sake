@@ -38,6 +38,18 @@ struct AddTitleSheet: View {
             TextField("Arguments", text: $model.typedTitleArguments)
                 .font(.callout.monospaced())
 
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Environment")
+                    .font(.callout)
+                TextEditor(text: $model.typedTitleEnvironment)
+                    .font(.callout.monospaced())
+                    .frame(height: 56)
+                    .border(.separator)
+                Text("One KEY=VALUE per line, for this title only.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             if let problem = model.addTitleProblem {
                 Text(problem)
                     .font(.callout)

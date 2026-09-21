@@ -48,21 +48,29 @@ struct TitleDetail: View {
             }
 
             if !title.arguments.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Started with")
-                        .font(.callout.weight(.medium))
-                    Text(title.arguments.joined(separator: " "))
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                block("Started with", Title.argumentsText(title.arguments))
+            }
+
+            if !title.environment.isEmpty {
+                block("In the environment", Title.environmentText(title.environment))
             }
 
             Spacer(minLength: 0)
         }
         .padding(28)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func block(_ heading: String, _ body: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(heading)
+                .font(.callout.weight(.medium))
+            Text(body)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     @ViewBuilder

@@ -59,7 +59,11 @@ public struct TitleLauncher: Sendable {
         bottle.command(
             "wine",
             [title.program] + title.arguments,
-            workingDirectory: title.directoryURL(in: bottle)
+            workingDirectory: title.directoryURL(in: bottle),
+            // Underneath the bottle's own, which is composed afterwards: a title cannot
+            // take `WINE_SIMULATE_WRITECOPY` away or point `WINEPREFIX` somewhere else.
+            inheriting: ProcessInfo.processInfo.environment
+                .merging(title.environment) { _, mine in mine }
         )
     }
 

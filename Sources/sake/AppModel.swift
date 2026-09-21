@@ -100,6 +100,7 @@ final class AppModel {
     var addedTitleExecutable: URL?
     var typedTitleName = ""
     var typedTitleArguments = ""
+    var typedTitleEnvironment = ""
     /// Why the program that was picked cannot be a title, as a sentence from SakeKit.
     var addTitleProblem: String?
 
@@ -570,6 +571,7 @@ final class AppModel {
         addedTitleExecutable = nil
         typedTitleName = ""
         typedTitleArguments = ""
+        typedTitleEnvironment = ""
         addTitleProblem = nil
         isAddingTitle = true
     }
@@ -583,7 +585,7 @@ final class AppModel {
             typedTitleName = url.deletingPathExtension().lastPathComponent
         }
         if typedTitleArguments.isEmpty {
-            typedTitleArguments = Title.suggestedArguments(for: url).joined(separator: " ")
+            typedTitleArguments = Title.argumentsText(Title.suggestedArguments(for: url))
         }
     }
 
@@ -591,7 +593,8 @@ final class AppModel {
         editingTitle = title
         editingTitleBottle = bottle
         typedTitleName = title.name
-        typedTitleArguments = title.arguments.joined(separator: " ")
+        typedTitleArguments = Title.argumentsText(title.arguments)
+        typedTitleEnvironment = Title.environmentText(title.environment)
         addTitleProblem = nil
         isEditingTitle = true
     }
@@ -605,11 +608,13 @@ final class AppModel {
             addTitleProblem = TitleStoreError.unnamed.localizedDescription
             return
         }
+        guard let environment = typedEnvironment() else { return }
         let edited = Title(
             id: title.id,
             name: name,
             executable: title.executable,
-            arguments: typedTitleArguments.split(separator: " ").map(String.init)
+            arguments: Title.arguments(from: typedTitleArguments),
+            environment: environment
         )
         do {
             try store.add(edited)
@@ -622,18 +627,38 @@ final class AppModel {
 
     func addTitle() {
         guard let executable = addedTitleExecutable else { return }
+        guard let environment = typedEnvironment() else { return }
         let store = TitleStore(bottle: Bottle(paths: paths, name: addTitleTarget))
         do {
-            let arguments = typedTitleArguments
-                .split(separator: " ")
-                .map(String.init)
-            try store.add(store.title(at: executable, named: typedTitleName, arguments: arguments))
+            try store.add(store.title(
+                at: executable,
+                named: typedTitleName,
+                arguments: Title.arguments(from: typedTitleArguments),
+                environment: environment
+            ))
             addTitleProblem = nil
             isAddingTitle = false
             survey()
         } catch {
             addTitleProblem = error.localizedDescription
         }
+    }
+
+    /// What was typed into the environment field, or `nil` with the problem already set.
+    ///
+    /// Refused rather than dropped: a variable that is silently ignored is worse than one
+    /// that is refused, because the run then behaves as though it had been set.
+    private func typedEnvironment() -> [String: String]? {
+        let environment = Title.environment(from: typedTitleEnvironment)
+        let reserved = Title.reservedNames(in: environment)
+        guard reserved.isEmpty else {
+            addTitleProblem = """
+                \(reserved.formatted()) \(reserved.count == 1 ? "is" : "are") sake's own and \
+                cannot be set here — see docs/runtime.md.
+                """
+            return nil
+        }
+        return environment
     }
 
     /// Only what was added by hand can be taken out of the library, and taking it out

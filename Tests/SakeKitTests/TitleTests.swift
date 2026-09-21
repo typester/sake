@@ -297,3 +297,74 @@ private func collect(_ stream: AsyncStream<LaunchEvent>) async -> [LaunchEvent] 
     #expect(Title.suggestedArguments(for: game.appending(path: "Game.exe")).isEmpty)
 }
 
+
+/// The file every bottle already has on disk: written before `environment` existed, and
+/// therefore without the key. `TitleStore.load()` turns a decoding failure into an empty
+/// library rather than an error, so a synthesised decoder would make every title in every
+/// existing bottle silently disappear.
+@Test func aTitlesFileWrittenBeforeEnvironmentExistedStillLoads() throws {
+    let paths = temporaryRoot()
+    defer { remove(paths) }
+    try makeEngineAndBottle(paths, installing: nil)
+
+    let bottle = Bottle(paths: paths)
+    try Data("""
+        [
+          {
+            "arguments" : ["--in-process-gpu"],
+            "executable" : "Program Files (x86)/Battle.net/Battle.net.exe",
+            "id" : "battle-net",
+            "name" : "Battle.net"
+          },
+          {
+            "arguments" : [],
+            "executable" : "Program Files (x86)/Steam/Steam.exe",
+            "id" : "steam",
+            "name" : "Steam"
+          }
+        ]
+        """.utf8).write(to: TitleStore(bottle: bottle).url)
+
+    let loaded = TitleStore(bottle: bottle).load()
+    #expect(loaded.map(\.id) == ["battle-net", "steam"])
+    #expect(loaded.allSatisfy { $0.environment.isEmpty })
+}
+
+/// A flag whose value contains a space could not be written at all while the field was
+/// split on spaces. The quotes group and are not passed on, so the round trip is `argv`
+/// coming back the same rather than the text coming back the same.
+@Test func aQuotedArgumentSurvivesTheTripThroughTheField() {
+    let typed = #"--exec="launch D4" -uid fenris"#
+    let arguments = Title.arguments(from: typed)
+
+    #expect(arguments == ["--exec=launch D4", "-uid", "fenris"])
+    #expect(Title.arguments(from: Title.argumentsText(arguments)) == arguments)
+    // Runs of whitespace are separators, not empty arguments.
+    #expect(Title.arguments(from: "  -a   -b  ") == ["-a", "-b"])
+    // A line that is not a variable is not half a variable either.
+    #expect(Title.environment(from: "MTL_HUD_ENABLED=1\nnonsense\n=2\nA=b=c") == [
+        "MTL_HUD_ENABLED": "1", "A": "b=c",
+    ])
+}
+
+/// The point of a per-title variable, and the line it may not cross: the bottle composes
+/// its own environment after this one, so `WINE_SIMULATE_WRITECOPY` cannot be taken away
+/// by a title. See docs/runtime.md.
+@Test func aTitleCarriesItsOwnEnvironmentButCannotDisplaceTheBottles() throws {
+    let paths = temporaryRoot()
+    defer { remove(paths) }
+    try makeEngineAndBottle(paths)
+
+    let hud = Title(
+        id: battleNet.id,
+        name: battleNet.name,
+        executable: battleNet.executable,
+        arguments: battleNet.arguments,
+        environment: ["MTL_HUD_ENABLED": "1", "WINE_SIMULATE_WRITECOPY": "0"]
+    )
+    let environment = TitleLauncher(paths: paths, title: hud).command().environment
+
+    #expect(environment?["MTL_HUD_ENABLED"] == "1")
+    #expect(environment?["WINE_SIMULATE_WRITECOPY"] == "1")
+    #expect(Title.reservedNames(in: hud.environment) == ["WINE_SIMULATE_WRITECOPY"])
+}

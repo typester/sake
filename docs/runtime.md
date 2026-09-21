@@ -143,6 +143,29 @@ sake does this on 2026-09-19: it copies `libd3dshared.dylib` into
 `d3d12.so` linking `@rpath/libd3dshared.dylib` and that symlink landing on a real x86_64
 Mach-O. **Nothing has been run against it.**
 
+### Everything else belongs to one title
+
+The three above are sake's, and `Bottle.environment` puts them on everything the engine
+runs. Anything else is one title's business, and since 2026-09-21 a title carries its own
+`KEY=VALUE` pairs. They go in underneath the bottle's, which is composed afterwards, so the
+five names `Bottle.environment` writes — `WINEPREFIX`, `WINEDLLOVERRIDES`, `WINEDEBUG`,
+`WINE_SIMULATE_WRITECOPY` and `CX_APPLEGPTK_LIBD3DSHARED_PATH` — win. The sheet refuses
+those by name rather than accepting a value it would then quietly ignore, because a run that
+behaves as though a variable had been set is the worse of the two failures.
+
+**`MTL_HUD_ENABLED=1` draws Metal's performance HUD, and D3DMetal adds a section of its
+own to it.** The HUD belongs to the OS, so anything rendering through Metal can show it;
+what makes it worth knowing here is that block. Measured in Diablo IV on sake's own
+engine, 2026-09-21: above an FPS and GPU-time graph the HUD names the translation
+`D3D12 (Metal 4)` and the process `x86_64`, and below it lists
+`Game Porting Toolkit 4.0b2` with Dispatch, Draw, Clear Resource, Copy Resource and
+ExecuteIndirect counts. It is the cheapest look at what D3DMetal is doing per frame, and
+it costs no trace.
+
+The prototype lists this variable among the ones that made no difference. That is about
+the hang it was tested against, not about the HUD: it did not fix the hang, and it does
+draw.
+
 ## Starting a title
 
 From the game's own directory, by its bare leaf name, with the title's arguments. sake did
