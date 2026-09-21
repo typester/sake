@@ -89,6 +89,9 @@ deliberately does not offer a button that starts Diablo IV directly: the client 
 out a login token after that press, so a direct start reaches the game and then fails on the
 token. `docs/runtime.md` has the measurements behind that.
 
+**[`docs/getting-started.md`](docs/getting-started.md) walks one game through all of this
+with screenshots** — Diablo IV, from a Mac with nothing on it to a character on screen.
+
 ## Why build Wine at all
 
 The piece that makes DirectX 12 work on macOS is Apple's closed D3DMetal, and the Wine-side
@@ -108,8 +111,8 @@ unmounts it again. See `docs/licensing.md`.
 | `Sources/SakeKit/` | the layout, a subprocess runner, the preflight checks, the source fetcher, the prefix build, the Wine build, the patch step, the D3DMetal step, the bottle, the import, the installer, the titles, starting one, how big a tree is, and the uninstall |
 | `Sources/sake/` | the SwiftUI app — two windows, kept thin |
 | `patches/` | the changes sake makes to Wine's own code — LGPL-2.1-or-later, not MIT; `patches/README.md` says where each came from |
-| `docs/` | how the thing actually has to work, and what breaks when it doesn't |
-| `assets/` | the app icon, the code that draws it, and the screenshot above |
+| `docs/` | how the thing actually has to work, what breaks when it doesn't, and how to play one game |
+| `assets/` | the app icon, the code that draws it, the screenshot above, and the guide's under `getting-started/` |
 | `scripts/build-app.sh` | builds `target/Sake.app` |
 | `scripts/make-icon.sh` | redraws `assets/Sake.icns` |
 | `scripts/test.sh` | runs the tests |
@@ -137,6 +140,7 @@ and carry their own date.
 
 | file | what it covers |
 |---|---|
+| `docs/getting-started.md` | the one written for using sake rather than building it: Diablo IV, step by step, with screenshots |
 | `docs/roadmap.md` | the goal, the phases, and where Swift stops and subprocesses start |
 | `docs/wine-build.md` | building Wine from CrossOver's sources; the flags that cannot be dropped |
 | `docs/runtime.md` | creating a prefix, the three settings that make games run, what pressing Play actually does, controllers, taking a bottle down, and how to tell four failure states apart |

@@ -116,6 +116,7 @@ implementing anything it covers.
 
 | file | what it covers |
 |---|---|
+| `docs/getting-started.md` | Diablo IV from an empty Mac to a keypress; the only file here for using sake |
 | `docs/roadmap.md` | phases, and the settled boundary between Swift and subprocesses |
 | `docs/wine-build.md` | building Wine; the configure flags that must not be removed |
 | `docs/runtime.md` | the three settings games need, the Play-button root cause, controllers, failure states |
@@ -123,7 +124,7 @@ implementing anything it covers.
 | `docs/layout.md` | on-disk layout, why nothing mutable goes in the bundle, relocatability |
 | `docs/releasing.md` | how a release is cut, and the three things it needs that are not in this repository |
 
-Two standing rules about that content:
+Three standing rules about that content:
 
 - **Claims in `docs/` carry their source and date.** Most were measured in the prototype and
   not in sake; do not restate those as sake's own behaviour. Where sake has measured
@@ -131,6 +132,11 @@ Two standing rules about that content:
   what you add.
 - **Do not relitigate the Swift/subprocess boundary** without new information;
   `docs/roadmap.md` records why it is where it is.
+- **`docs/getting-started.md` is instructions, and stays that way.** It is written for somebody
+  using sake rather than building it: steps rather than prose, and **no dated claims at all** —
+  what has been run here, what has not, and on which hardware belongs in the files that already
+  carry it, because a page people follow is where that goes stale first. Screenshots go in
+  `assets/getting-started/`.
 
 ## Licence boundary
 

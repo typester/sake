@@ -322,13 +322,23 @@ reasonable descriptor and then sends **no input reports at all** until it has be
 Nintendo's handshake, which lives in SDL's HIDAPI driver. An IOHID-only build gives a
 controller that is plugged in, visible to macOS, and completely dead in the game.
 
-Verified by playing the game with a Switch Pro Controller over USB, 2026-09-17. Bluetooth
-and other pads are untested.
+Verified by playing the game with a Switch Pro Controller over USB, 2026-09-17.
 
 **The same controller and cable played Diablo IV through sake on 2026-09-20.** Reported by
 the owner, not instrumented — there is no log of that run. What it settles is that the SDL2
 requirement above carries over to sake's own engine and bottle; it is not new evidence about
 the driver.
+
+**And over Bluetooth on 2026-09-21** — the same pad, no cable, played in the game. The owner's
+report again, which is what takes "Bluetooth is untested" off this section. Other pads are
+still untested.
+
+**That pad is an 8BitDo Ultimate 2 Bluetooth Controller**, not Nintendo hardware: it claims
+Nintendo's own ids, `Vendor 0x057E / Product 0x2009`, and macOS lists it as `Pro Controller`.
+Read here from `system_profiler SPBluetoothDataType`, 2026-09-21. So "Switch Pro Controller"
+above is the identity the pad presents rather than who built it — and that identity is the
+thing that matters, because the ids are what send it down SDL's Switch driver and Nintendo's
+handshake.
 
 Use SDL2 newer than CrossOver's 2.30.12: 2.32.2 fixed a crash initialising with controllers
 already connected on macOS, 2.32.6 fixed reliability of initializing Switch controllers on
