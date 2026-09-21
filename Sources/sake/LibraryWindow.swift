@@ -125,7 +125,7 @@ struct LibraryWindow: View {
                 .selectionDisabled()
         } else {
             ForEach(titles) { title in
-                Label(title.name, systemImage: "gamecontroller")
+                Text(title.name)
                     .tag(LibrarySelection.title(bottle: bottle.name, id: title.id))
                     .contextMenu {
                         // Only what was added by hand, and it takes the entry away rather

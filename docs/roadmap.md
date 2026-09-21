@@ -140,6 +140,12 @@ way in became the bottle's own screen. The setup
 wizard is a window instead precisely because it does not finish quickly: it runs for tens of
 minutes and sends the user to a browser part way through.
 
+A row is its name and nothing else: every row under a heading is a title, so a per-row
+glyph tells them apart from nothing, and `gamecontroller` — the widest symbol of the ones
+tried, ink filling its 22×14pt box — pushed each name 27pt right of its own heading.
+Measured in sake on 2026-09-21. If that column is ever wanted back, what would earn it is
+state the detail pane can only show for one title at a time: running, or not installed.
+
 **More than one bottle followed on 2026-09-19.** The library is a section per bottle, and a
 bottle is selectable in its own right rather than only through the games in it — a bottle
 just made has nothing in it, so a heading alone would be a dead end. What the detail pane for
