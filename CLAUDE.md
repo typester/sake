@@ -28,6 +28,11 @@ The version lives in `VERSION`, and release-please owns it. Do not edit it by ha
 not tag by hand: a push to `main` opens or updates a release pull request, and merging that
 pull request is what tags, releases and builds.
 
+**Changes arrive on `main` by squash merge, so the pull request title is the commit
+message** — it carries the prefix and it is what release-please reads. The body of the
+pull request becomes the body of the commit, so what belongs in one belongs in the other,
+and the commits on the branch are working notes that do not survive.
+
 ## Package Naming
 
 The bundle identifier is `dev.typester.sake`. **Not `com.typester.*`** — `typester.com` is
