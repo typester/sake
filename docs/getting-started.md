@@ -20,7 +20,7 @@ in `~/Library/Caches/Sake`. **Uninstall sake…** in the app menu takes both to 
 
 ```sh
 brew tap typester/sake
-brew install --cask sake
+brew install --cask typester/sake/sake
 ```
 
 The app is not notarised, so Gatekeeper stops it the first time: allow it in System Settings >

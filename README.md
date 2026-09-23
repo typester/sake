@@ -53,7 +53,7 @@ the bottles under `~/Library/Sake`, and its build output under `~/Library/Caches
 
 ```sh
 brew tap typester/sake
-brew install --cask sake
+brew install --cask typester/sake/sake
 ```
 
 Apple silicon and macOS 15 or newer; the cask refuses to install anywhere else. The app is
