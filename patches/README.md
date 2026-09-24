@@ -16,7 +16,8 @@ worked.
 
 Three kinds of file live here, and the header of each says which it is:
 
-- **sake's own** (`0001`, `0002`, `0006`): written here, against something measured here.
+- **sake's own** (`0001`, `0002`, `0006`, `0007`): written here, against something measured
+  here.
 - **Upstream Wine commits carried early** (`0003`, `0004`): named by hash and author in the
   header, applied as upstream wrote them apart from hunks the header says were moved. They
   exist because CrossOver's sources lag upstream, and **each is dropped the moment the

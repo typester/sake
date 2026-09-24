@@ -55,8 +55,11 @@ public struct TitleLauncher: Sendable {
     /// Started from the game's own directory and named by its bare leaf, which is how the
     /// prototype started it and what keeps `argv[0]` distinguishable from the full Windows
     /// path the Battle.net Agent passes.
-    public func command() -> Command {
-        bottle.command(
+    ///
+    /// A ``GameBundle`` `wine` also sets `SAKE_GAME_BUNDLES`, so every program it starts
+    /// gets a bundle of its own. `nil` runs the engine's `bin/wine`.
+    public func command(wine: URL? = nil) -> Command {
+        var command = bottle.command(
             "wine",
             [title.program] + title.arguments,
             workingDirectory: title.directoryURL(in: bottle),
@@ -65,6 +68,17 @@ public struct TitleLauncher: Sendable {
             inheriting: ProcessInfo.processInfo.environment
                 .merging(title.environment) { _, mine in mine }
         )
+        if let wine {
+            command.executable = wine
+            command.environment?["SAKE_GAME_BUNDLES"] = paths.programBundles.path
+        }
+        return command
+    }
+
+    /// A failure to make the bundle is not a failure to start the game: the game runs
+    /// either way, and only Game Mode is lost.
+    public func gameWine() -> URL? {
+        (try? GameBundle(paths: paths).prepare()) ?? nil
     }
 
     public func launch() -> AsyncStream<LaunchEvent> {
@@ -78,7 +92,7 @@ public struct TitleLauncher: Sendable {
                     let log = try LogFile(at: logURL)
                     defer { log.close() }
 
-                    let command = self.command()
+                    let command = self.command(wine: self.gameWine())
                     log.write("=== launch \(command.arguments.joined(separator: " "))\n")
                     continuation.yield(.started(title))
 
@@ -137,8 +151,9 @@ public struct TitleLauncher: Sendable {
 
     /// wineserver is matched on the engine root and the name rather than on
     /// `engine/bin/wineserver`, because it does not spell itself that way: measured on
-    /// 2026-09-19, `ps` shows `<engine>/lib/wine/../../bin/wineserver`. The tidier path
-    /// never matches, and a survivor check that never matches reports success.
+    /// 2026-09-19, `ps` shows `<engine>/lib/wine/../../bin/wineserver`, and one a title
+    /// started shows `<engine>/SakeGame.app/Contents/MacOS/../../bin/wineserver`. The
+    /// tidier path never matches, and a survivor check that never matches reports success.
     static func ours(in lines: [String], program: String, engine: URL) -> [String] {
         lines.filter { line in
             matches(line, program: program)

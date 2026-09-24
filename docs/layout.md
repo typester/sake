@@ -12,6 +12,12 @@ those were measured in sake.
 /Applications/Sake.app                       the app, and nothing else
 ~/Library/Sake/
     engine/                                  Wine, its libraries and D3DMetal, 1.1 GB
+    engine/SakeGame.app                      Wine's unix side again, as a bundle macOS
+                                             sees as a game, which titles start from;
+                                             generated, 5.6 MB — see runtime.md
+    engine/SakePrograms/<key>/<program>.app  the same, one per program a title starts,
+                                             made by Wine itself; hard links, so nothing
+                                             on disk — see runtime.md
     bottles/<name>/                          one prefix each, and the games in them; empty
                                              is 1 GB, and a cloned game adds nothing
     bottles/<name>/sake-titles.json          what was added to the library by hand, if

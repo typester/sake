@@ -1,0 +1,465 @@
+ntdll: start each program from a game bundle named after it.
+
+sake starts a title from <engine>/SakeGame.app/Contents/MacOS/wine, a copy of Wine's
+unix side inside an .app that declares LSApplicationCategoryType games, because macOS
+decides Game Mode from the bundle a process's executable is in. Every process the title
+starts afterwards comes from the same loader, since init_paths() derives the loader for
+the next process from realpath() of ntdll.so -- so without this, Diablo IV started from
+Battle.net is in that one bundle, and the Dock labels its tile with that bundle's name.
+The Dock takes that label from the bundle's file name and nothing else: measured on
+2026-09-23, neither CFBundleName nor an _kLSDisplayNameKey the process sets on itself
+changes it.
+
+So when SAKE_GAME_BUNDLES is set, a process being started whose loader sits in
+<bundle>/Contents/MacOS is started from $SAKE_GAME_BUNDLES/<key>/<program>.app instead,
+made on first use as a mirror of the parent's bundle: directories made, symlinks copied
+as they are, files hard-linked, and an Info.plist of its own naming the program. Hard
+links and not symlinks, because through a symlink realpath() would lead back into the
+parent's bundle and the program's own children would leave its. They cost directory
+entries only.
+
+The name is extract_exe_name(), which CW HACK 22144 already uses for the same purpose:
+that hack names a link after the program so the Dock shows it, and does so only when
+WINEDLLPATH is set, in a temporary directory that is no bundle. This runs before it, and
+when it has put the program in a bundle the hack is skipped: its link would take the
+program back out, which with WINEDLLPATH set is what happened, measured on 2026-09-23.
+
+<key> is a 64-bit FNV-1a of the exe's unix path, lower-cased, and the bundle identifier
+is dev.typester.sake.program.<program>.<key>. The name alone is not the program: two
+games may both ship a Launcher.exe or a crashpad_handler.exe, and a bundle is one
+identity to macOS -- name, icon and Game Mode session -- so keyed by name the second
+would have been shown with the first one's icon. Measured the same day with notepad.exe
+and winemine.exe both copied in as Launcher.exe: two bundles, two identifiers, two
+icons, and the same exe under another spelling of its path found its own. The extension
+is cut here: extract_exe_name() measures the name without it and then returns the whole
+string, which made the first bundles notepad.exe.app.
+
+Measured on 2026-09-23 against a lab bundle and a fresh prefix, `wine start notepad`:
+notepad came up from notepad.app as its own bundle identifier, Foreground, and explorer
+from explorer.app as UIElement; the Dock labelled the tile "notepad", and full-screen
+turned Game Mode on. The bundle's ntdll.so was the parent's inode.
+
+The bundle also carries the program's own icon, because the Game Overlay shows the icon
+a bundle had when macOS first registered it and nothing later: an icon added afterwards
+stayed blank even through lsregister -f. So it has to be in place before the first exec,
+and it is: the exe's first RT_GROUP_ICON and the RT_ICON images it lists, put back
+together as Contents/Resources/AppIcon.ico and named in CFBundleIconFile. A .ico is
+enough; the file is read through $WINEPREFIX/dosdevices, since image_path is the Windows
+path. An exe with no icon, or one this cannot read, gets a bundle without one. Measured
+on 2026-09-23: notepad.exe gave a ten-image .ico and the overlay showed notepad's icon.
+
+A bundle is current when its loader is the same file as the running one and its
+Info.plist carries SakeBundleFormat 2. One without the marker was made before the icon
+was, and is made again under a new identifier, dev.typester.sake.program.<program>:
+registered once without an icon, the old identifier would stay without it. One that is
+not current -- the title's bundle was remade after the engine was rebuilt, or the format
+is older -- is renamed aside to <key>/.stale-<pid> and made again, and a failed or lost
+attempt leaves <key>/.staging-<pid>; sake sweeps both. Nothing changes when the variable
+is unset, when the running loader is not in a bundle, or when any step fails: the
+process is then started from the loader it would have been.
+
+--- a/dlls/ntdll/unix/loader.c
++++ b/dlls/ntdll/unix/loader.c
+@@ -70,6 +70,7 @@
+ # include <mach/mach_error.h>
+ # include <mach-o/getsect.h>
+ # include <crt_externs.h>
++# include <dirent.h>
+ # ifndef _POSIX_SPAWN_DISABLE_ASLR
+ #  define _POSIX_SPAWN_DISABLE_ASLR 0x0100
+ # endif
+@@ -646,8 +647,384 @@
+         /* Pass the app name to the preloader through an env var. */
+         setenv("WINEPRELOADERAPPNAME", app_name, 1);
+         free(app_name);
++    }
++}
++
++/* sake: run each program from an .app named after it.
++ *
++ * The Dock labels a bundled process with the bundle's file name, and the Game Overlay shows
++ * the name and icon a bundle had when macOS first registered it. So a program started from
++ * a game bundle (<bundle>/Contents/MacOS/wine, as sake starts titles) is started here from
++ * $SAKE_GAME_BUNDLES/<program>.app instead: a mirror of that bundle made of hard links, with
++ * an Info.plist naming the program and the program's own icon, both in place before the
++ * first exec. Hard links rather than symlinks because init_paths() takes realpath() of
++ * ntdll.so as the base for everything, including the loader for the next process: through a
++ * symlink it would land back in the parent's bundle.
++ */
++
++/* Written into every Info.plist made here. A bundle without it predates something a
++ * registered bundle cannot pick up in place, so it is made again rather than reused. */
++static const char sake_format[] = "    <key>SakeBundleFormat</key>\n    <string>2</string>\n";
++
++static char *sake_path( const char *format, ... )
++{
++    va_list args;
++    char *ret;
++    int len;
++
++    va_start( args, format );
++    len = vasprintf( &ret, format, args );
++    va_end( args );
++    return len < 0 ? NULL : ret;
++}
++
++static UINT sake_u16( const unsigned char *p ) { return p[0] | (p[1] << 8); }
++static UINT sake_u32( const unsigned char *p ) { return p[0] | (p[1] << 8) | (p[2] << 16) | ((UINT)p[3] << 24); }
++
++static void sake_put32( unsigned char *p, UINT value )
++{
++    p[0] = value; p[1] = value >> 8; p[2] = value >> 16; p[3] = value >> 24;
++}
++
++/* The entry for id in the resource directory at dir, or the first one when id is 0. */
++static BOOL sake_res_entry( const unsigned char *rsrc, size_t size, UINT dir, UINT id, UINT *out )
++{
++    UINT i, count;
++
++    if (dir > size || size - dir < 16) return FALSE;
++    count = sake_u16( rsrc + dir + 12 ) + sake_u16( rsrc + dir + 14 );
++    if ((size - dir - 16) / 8 < count) return FALSE;
++    for (i = 0; i < count; i++)
++    {
++        const unsigned char *entry = rsrc + dir + 16 + i * 8;
++        if (id && sake_u32( entry ) != id) continue;
++        *out = sake_u32( entry + 4 );
++        return TRUE;
++    }
++    return FALSE;
++}
++
++/* type, then name, then the first language, to the RVA and size of the data. */
++static BOOL sake_res_data( const unsigned char *rsrc, size_t size, UINT type, UINT name,
++                           UINT *rva, UINT *len )
++{
++    UINT off;
++
++    if (!sake_res_entry( rsrc, size, 0, type, &off ) || !(off & 0x80000000)) return FALSE;
++    if (!sake_res_entry( rsrc, size, off & 0x7fffffff, name, &off ) || !(off & 0x80000000)) return FALSE;
++    if (!sake_res_entry( rsrc, size, off & 0x7fffffff, 0, &off ) || (off & 0x80000000)) return FALSE;
++    if (off > size || size - off < 16) return FALSE;
++    *rva = sake_u32( rsrc + off );
++    *len = sake_u32( rsrc + off + 4 );
++    return TRUE;
++}
++
++/* image_path is the Windows path; the drive letter is the prefix's dosdevices entry. */
++static char *sake_unix_path( const char *win )
++{
++    const char *prefix = getenv( "WINEPREFIX" ), *home = getenv( "HOME" );
++    char drive, *ret, *p;
++
++    if (!strncmp( win, "\\??\\", 4 )) win += 4;
++    if (win[0] == '/') return strdup( win );
++    if (!win[0] || win[1] != ':' || win[2] != '\\') return NULL;
++    drive = (win[0] >= 'A' && win[0] <= 'Z') ? win[0] - 'A' + 'a' : win[0];
++    if (prefix && *prefix) ret = sake_path( "%s/dosdevices/%c:", prefix, drive );
++    else if (home) ret = sake_path( "%s/.wine/dosdevices/%c:", home, drive );
++    else return NULL;
++    if (!ret) return NULL;
++    p = ret;
++    ret = sake_path( "%s%s", p, win + 2 );
++    free( p );
++    if (!ret) return NULL;
++    for (p = ret + strlen( ret ) - strlen( win + 2 ); *p; p++) if (*p == '\\') *p = '/';
++    return ret;
++}
++
++/* The section holding the resource directory, read whole: a game's resources are icons,
++ * strings and a manifest, and anything over the cap is not worth an exec's delay. */
++static unsigned char *sake_read_resources( int fd, UINT *va, UINT *size, UINT *rsrc_rva )
++{
++    unsigned char dos[64], nt[24], opt[240], section[40], *raw;
++    UINT lfanew, sections, opt_size, dir, i, ptr = 0;
++
++    if (pread( fd, dos, sizeof(dos), 0 ) != sizeof(dos) || dos[0] != 'M' || dos[1] != 'Z') return NULL;
++    lfanew = sake_u32( dos + 0x3c );
++    if (pread( fd, nt, sizeof(nt), lfanew ) != sizeof(nt) || memcmp( nt, "PE\0\0", 4 )) return NULL;
++    sections = sake_u16( nt + 6 );
++    opt_size = sake_u16( nt + 20 );
++    if (opt_size < 2 || opt_size > sizeof(opt) || pread( fd, opt, opt_size, lfanew + 24 ) != opt_size) return NULL;
++    if (sake_u16( opt ) == 0x20b) dir = 112;
++    else if (sake_u16( opt ) == 0x10b) dir = 96;
++    else return NULL;
++    if (opt_size < dir + 3 * 8 || !(*rsrc_rva = sake_u32( opt + dir + 2 * 8 ))) return NULL;
++
++    for (i = 0; i < sections; i++)
++    {
++        if (pread( fd, section, sizeof(section), lfanew + 24 + opt_size + i * 40 ) != sizeof(section)) return NULL;
++        *va = sake_u32( section + 12 );
++        *size = sake_u32( section + 16 );
++        ptr = sake_u32( section + 20 );
++        if (*rsrc_rva >= *va && *rsrc_rva - *va < *size) break;
++    }
++    if (i == sections || *size > 64 * 1024 * 1024 || !(raw = malloc( *size ))) return NULL;
++    if (pread( fd, raw, *size, ptr ) != *size)
++    {
++        free( raw );
++        return NULL;
++    }
++    return raw;
++}
++
++/* The exe's first RT_GROUP_ICON with the RT_ICON images it lists, put back together as a
++ * .ico, which is enough for CFBundleIconFile. */
++static BOOL sake_write_icon( const char *exe, const char *path )
++{
++    unsigned char *raw = NULL, *rsrc, *group, entry[16];
++    UINT va, size, rsrc_rva, group_rva, group_len, count, i, offset, rvas[64], lens[64];
++    size_t rsrc_size;
++    BOOL ok = FALSE;
++    FILE *f;
++    int fd;
++
++    if (!exe || (fd = open( exe, O_RDONLY )) == -1) return FALSE;
++    if (!(raw = sake_read_resources( fd, &va, &size, &rsrc_rva ))) goto done;
++    rsrc = raw + (rsrc_rva - va);
++    rsrc_size = size - (rsrc_rva - va);
++
++#define SAKE_IN_SECTION(rva, len) ((rva) >= va && (rva) - va <= size && size - ((rva) - va) >= (len))
++    if (!sake_res_data( rsrc, rsrc_size, 14 /* RT_GROUP_ICON */, 0, &group_rva, &group_len )) goto done;
++    if (group_len < 6 || !SAKE_IN_SECTION( group_rva, group_len )) goto done;
++    group = raw + (group_rva - va);
++    count = sake_u16( group + 4 );
++    if (!count || count > 64 || (group_len - 6) / 14 < count) goto done;
++    for (i = 0; i < count; i++)
++    {
++        if (!sake_res_data( rsrc, rsrc_size, 3 /* RT_ICON */, sake_u16( group + 6 + i * 14 + 12 ),
++                            &rvas[i], &lens[i] )) goto done;
++        if (!SAKE_IN_SECTION( rvas[i], lens[i] )) goto done;
++    }
++#undef SAKE_IN_SECTION
++
++    if (!(f = fopen( path, "w" ))) goto done;
++    fwrite( "\0\0\1\0", 1, 4, f );
++    fputc( count & 0xff, f );
++    fputc( count >> 8, f );
++    offset = 6 + count * 16;
++    for (i = 0; i < count; i++)
++    {
++        memcpy( entry, group + 6 + i * 14, 8 );  /* width, height, colours, reserved, planes, bits */
++        sake_put32( entry + 8, lens[i] );
++        sake_put32( entry + 12, offset );
++        fwrite( entry, 1, sizeof(entry), f );
++        offset += lens[i];
++    }
++    for (i = 0; i < count; i++) fwrite( raw + (rvas[i] - va), 1, lens[i], f );
++    if (!(ok = !fclose( f ))) unlink( path );
++
++done:
++    free( raw );
++    close( fd );
++    return ok;
++}
++
++static void sake_write_escaped( FILE *f, const char *text )
++{
++    for (; *text; text++)
++    {
++        if (*text == '&') fputs( "&amp;", f );
++        else if (*text == '<') fputs( "&lt;", f );
++        else if (*text == '>') fputs( "&gt;", f );
++        else fputc( *text, f );
++    }
++}
++
++static BOOL sake_write_plist( const char *path, const char *name, const char *key, BOOL icon )
++{
++    FILE *f;
++    const char *c;
++
++    if (!(f = fopen( path, "w" ))) return FALSE;
++    fputs( "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
++           "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" "
++           "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
++           "<plist version=\"1.0\">\n<dict>\n"
++           "    <key>CFBundleExecutable</key>\n    <string>wine</string>\n"
++           "    <key>CFBundleIdentifier</key>\n    <string>dev.typester.sake.program.", f );
++    for (c = name; *c; c++)
++        fputc( ((*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') || (*c >= '0' && *c <= '9') ||
++                *c == '-' || *c == '.') ? *c : '-', f );
++    fprintf( f, ".%s</string>\n    <key>CFBundleName</key>\n    <string>", key );
++    sake_write_escaped( f, name );
++    fputs( "</string>\n", f );
++    if (icon) fputs( "    <key>CFBundleIconFile</key>\n    <string>AppIcon.ico</string>\n", f );
++    fputs( sake_format, f );
++    fputs( "    <key>CFBundlePackageType</key>\n    <string>APPL</string>\n"
++           "    <key>LSApplicationCategoryType</key>\n    <string>public.app-category.games</string>\n"
++           "    <key>LSUIElement</key>\n    <true/>\n"
++           "    <key>NSHighResolutionCapable</key>\n    <true/>\n"
++           "</dict>\n</plist>\n", f );
++    return !fclose( f );
++}
++
++/* Directories are made, symlinks are copied as they are, and files are hard-linked. */
++static BOOL sake_mirror( const char *from, const char *to )
++{
++    struct dirent *entry;
++    BOOL ok = TRUE;
++    DIR *dir;
++
++    if (mkdir( to, 0755 ) && errno != EEXIST) return FALSE;
++    if (!(dir = opendir( from ))) return FALSE;
++    while (ok && (entry = readdir( dir )))
++    {
++        char *src, *dst, target[PATH_MAX];
++        struct stat st;
++        ssize_t len;
++
++        if (!strcmp( entry->d_name, "." ) || !strcmp( entry->d_name, ".." )) continue;
++        src = build_path( from, entry->d_name );
++        dst = build_path( to, entry->d_name );
++        if (lstat( src, &st )) ok = FALSE;
++        else if (S_ISLNK( st.st_mode ))
++        {
++            if ((len = readlink( src, target, sizeof(target) - 1 )) < 0) ok = FALSE;
++            else
++            {
++                target[len] = 0;
++                ok = !symlink( target, dst );
++            }
++        }
++        else if (S_ISDIR( st.st_mode )) ok = sake_mirror( src, dst );
++        else ok = !link( src, dst );
++        free( src );
++        free( dst );
+     }
++    closedir( dir );
++    return ok;
+ }
++
++/* The parent's bundle with this program's Info.plist and icon in place of the parent's,
++ * which came across with the hard links. */
++static BOOL sake_make_bundle( const char *source, const char *staging, const char *name,
++                              const char *key, const char *exe )
++{
++    char *resources = sake_path( "%s/Contents/Resources", staging );
++    char *icon = sake_path( "%s/Contents/Resources/AppIcon.ico", staging );
++    char *plist = sake_path( "%s/Contents/Info.plist", staging );
++    BOOL ok = FALSE;
++
++    if (resources && icon && plist && sake_mirror( source, staging ))
++    {
++        mkdir( resources, 0755 );
++        unlink( icon );
++        unlink( plist );
++        ok = sake_write_plist( plist, name, key, sake_write_icon( exe, icon ) );
++    }
++    free( resources );
++    free( icon );
++    free( plist );
++    return ok;
++}
++
++/* Which program this is, beyond its name: two games may both ship a Launcher.exe, and a
++ * bundle is one identity to macOS -- name, icon and Game Mode session. So the bundle sits
++ * under a hash of the exe's path, lower-cased because the drive is not case-sensitive and
++ * Windows programs do not agree on how to spell a path. FNV-1a, 64 bits. */
++static char *sake_key( const char *exe, const char *image_path )
++{
++    char *real = exe ? realpath( exe, NULL ) : NULL;
++    const char *c = real ? real : exe ? exe : image_path;
++    ULONGLONG hash = 0xcbf29ce484222325ull;
++
++    for (; *c; c++)
++    {
++        hash ^= (unsigned char)((*c >= 'A' && *c <= 'Z') ? *c - 'A' + 'a' : *c);
++        hash *= 0x100000001b3ull;
++    }
++    free( real );
++    return sake_path( "%016llx", (unsigned long long)hash );
++}
++
++/* Its loader is the very file the running one is -- which also covers a program starting
++ * another copy of itself -- and it is of this format. */
++static BOOL sake_is_current( const char *bundle, const char *running )
++{
++    char *loader = sake_path( "%s/Contents/MacOS/wine", bundle );
++    char *plist = sake_path( "%s/Contents/Info.plist", bundle );
++    struct stat a, b;
++    BOOL ok = FALSE;
++    char text[4096];
++    size_t len;
++    FILE *f;
++
++    if (loader && plist && !stat( loader, &a ) && !stat( running, &b ) &&
++        a.st_dev == b.st_dev && a.st_ino == b.st_ino && (f = fopen( plist, "r" )))
++    {
++        len = fread( text, 1, sizeof(text) - 1, f );
++        fclose( f );
++        text[len] = 0;
++        ok = strstr( text, sake_format ) != NULL;
++    }
++    free( loader );
++    free( plist );
++    return ok;
++}
++
++/* TRUE when the program is to start from its own bundle, which *wineloader_path now names. */
++static BOOL sake_use_game_bundle( char **wineloader_path, const char *image_path )
++{
++    const char *root = getenv( "SAKE_GAME_BUNDLES" );
++    char *name = NULL, *macos = NULL, *source = NULL, *exe = NULL, *key = NULL, *dir = NULL;
++    char *target = NULL, *staging = NULL, *stale, *p;
++    BOOL ok = FALSE;
++
++    if (!root || !*root || !(name = extract_exe_name( image_path ))) goto done;
++    /* extract_exe_name() measures the name without its extension and then returns it with. */
++    if ((p = strrchr( name, '.' )) && p != name) *p = 0;
++    if (!(macos = realpath_dirname( *wineloader_path ))) goto done;
++    if (!(source = remove_tail( macos, "/Contents/MacOS" ))) goto done;
++    exe = sake_unix_path( image_path );
++    if (!(key = sake_key( exe, image_path ))) goto done;
++    if (!(dir = sake_path( "%s/%s", root, key ))) goto done;
++    if (!(target = sake_path( "%s/%s.app", dir, name ))) goto done;
++
++    if (!sake_is_current( target, *wineloader_path ))
++    {
++        mkdir( root, 0755 );
++        mkdir( dir, 0755 );
++        /* A failure leaves the staging copy behind for sake to sweep; it costs nothing but
++         * directory entries. */
++        if (!(staging = sake_path( "%s/.staging-%d", dir, (int)getpid() ))) goto done;
++        if (!sake_make_bundle( source, staging, name, key, exe )) goto done;
++        if (!access( target, F_OK ) && (stale = sake_path( "%s/.stale-%d", dir, (int)getpid() )))
++        {
++            rename( target, stale );
++            free( stale );
++        }
++        /* Losing a race to another process making the same bundle is fine if what won is
++         * current. */
++        if (rename( staging, target ) && !sake_is_current( target, *wineloader_path )) goto done;
++    }
++
++    if ((p = sake_path( "%s/Contents/MacOS/wine", target )))
++    {
++        free( *wineloader_path );
++        *wineloader_path = p;
++        ok = TRUE;
++    }
++
++done:
++    free( name );
++    free( macos );
++    free( source );
++    free( exe );
++    free( key );
++    free( dir );
++    free( target );
++    free( staging );
++    return ok;
++}
+ #endif
+ 
+ 
+@@ -679,7 +1056,8 @@
+      * When the preloader is not being used, WINEDLLPATH needs to be set correctly for
+      * the loader to find ntdll.so, so don't even attempt this unless WINEDLLPATH is set.
+      */
+-    if (getenv("WINEDLLPATH"))
++    /* Hack 22144's link would take the program back out of its bundle. */
++    if (!sake_use_game_bundle( &(argv[1]), image_path ) && getenv("WINEDLLPATH"))
+         replace_wineloader_path_with_link( &(argv[1]), image_path );
+ #endif
+ 
