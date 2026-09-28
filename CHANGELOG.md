@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/typester/sake/compare/v0.1.1...v0.1.2) (2026-09-28)
+
+
+### Bug Fixes
+
+* generate Wine's include/ first, because makedep leaves some objects not depending on headers they include ([#12](https://github.com/typester/sake/issues/12)) ([471f790](https://github.com/typester/sake/commit/471f7906b8b43f25557ea6d1261f858eadb4b979))
+
 ## [0.1.1](https://github.com/typester/sake/compare/v0.1.0...v0.1.1) (2026-09-21)
 
 
