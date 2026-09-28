@@ -4,6 +4,7 @@ public enum WinePhase: String, Sendable {
     case patch
     case configure
     case sonames
+    case headers
     case make
     case install
     case verify
@@ -222,6 +223,17 @@ public struct WineBuilder: Sendable {
 
         onPhase(.sonames)
         try pinSonames(log: log)
+
+        // A make of its own, before anything is compiled: makedep does not follow
+        // `#include "x.idl"` when it works out what a generated header includes, so some
+        // objects miss a dependency on headers theirs include -- actxprxy_mshtml_p.o on
+        // include/exdisp.h -- and -j can compile one first. Every header it misses is in
+        // include/. See docs/wine-build.md.
+        onPhase(.headers)
+        try await runPhase(
+            .headers, make, ["-j\(jobs)", "include/all"],
+            environment: environment, log: log, onOutput: onOutput
+        )
 
         onPhase(.make)
         try await runPhase(.make, make, ["-j\(jobs)"], environment: environment, log: log, onOutput: onOutput)

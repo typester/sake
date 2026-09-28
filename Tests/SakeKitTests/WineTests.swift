@@ -103,7 +103,10 @@ private func makeFakeTree(
         HEADER
         cat > Makefile <<'MAKEFILE'
         all:
+        \t@test -f include/generated || { echo 'compiled before include/ was generated'; exit 1; }
         \t@echo building wine
+        include/all:
+        \t@touch include/generated
         install:
         \t@mkdir -p $$(cat prefix)/bin $$(cat prefix)/lib/wine/x86_64-unix
         \t@touch $$(cat prefix)/bin/wine
@@ -194,9 +197,26 @@ private func failure(in events: [WineEvent]) -> (reason: String, log: URL?)? {
     let phases = events.compactMap { event -> WinePhase? in
         if case .phase(let phase) = event { phase } else { nil }
     }
-    #expect(phases == [.patch, .configure, .sonames, .make, .install, .verify])
+    #expect(phases == [.patch, .configure, .sonames, .headers, .make, .install, .verify])
     #expect(events.contains(.installed(version: "Wine version 11.0")))
     #expect(builder.isBuilt)
+}
+
+@Test func includeIsGeneratedByAMakeOfItsOwnBeforeAnythingIsCompiled() async throws {
+    let paths = temporaryRoot()
+    defer { remove(paths) }
+    try makeFakeTree(in: paths)
+
+    let builder = builder(in: paths)
+    let events = await collect(builder.build())
+
+    // The fake `all` refuses to run until `include/all` has, which is the order a real
+    // build needs. See docs/wine-build.md.
+    #expect(failure(in: events) == nil)
+    let log = try String(contentsOf: builder.logURL, encoding: .utf8)
+    #expect(log.contains(
+        "=== headers /usr/bin/make -j\(ProcessInfo.processInfo.activeProcessorCount) include/all\n"
+    ))
 }
 
 @Test func wineIsBuiltOutOfTreeSoTheOnlyCopyOfItsSourceStaysClean() async throws {
