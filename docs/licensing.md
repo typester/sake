@@ -117,7 +117,10 @@ libHttpClient's licence goes wherever that DLL goes. From WineGDK it takes facts
 which IDs the interfaces have and the order of their slots. This section used to say code
 would start from the part of WineGDK its author declared CC0; the part worth taking turned out
 to be libHttpClient's, under an LGPL header there (`gdk.md`). Signing in uses the title's own
-`MSAAppId` from its `MicrosoftGame.config`; sake signs in as no other application.
+`MSAAppId` from its `MicrosoftGame.config`; sake signs in as no other application, and every
+request made while finding out how used that ID alone. Its requests are the shapes Microsoft's
+documentation gives where it gives them and otherwise what the services accepted
+(`gdk.md`); none comes from the stand-in or from Xodus.
 
 ## Why D3DMetal cannot simply be avoided
 

@@ -28,6 +28,13 @@ does. **Sake.app is not one of them** — it is running at the time, and a bundl
 `/Applications` is the user's to drag away; the sheet says so rather than leaving the user
 to wonder whether the app deleted itself.
 
+Those two are not the whole of what sake leaves, which this section did not say until
+2026-09-29. AppKit keeps the windows' frames and the open panel's last folder in
+`~/Library/Preferences/dev.typester.sake.plist`, and `SourceFetcher`'s default URLSession
+left `~/Library/HTTPStorages/dev.typester.sake` and `~/Library/Caches/dev.typester.sake`
+on 2026-09-20. Uninstalling does not take them yet. The sign-in uses a session that keeps
+nothing on disk, so it adds nothing there.
+
 Run for real on 2026-09-19 against the tree described above, and put back afterwards:
 
 | | |
