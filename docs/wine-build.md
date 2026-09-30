@@ -86,6 +86,14 @@ shapes a tree can be in when a build starts — pristine, an older version's pre
 applied stack with a new patch on top — and the stack that does not reverse, which is still
 the error it always was.
 
+**Patches apply with no fuzz.** `patch` by default lets a hunk match with its two outer
+lines of context missing, so a hunk whose context this tree does not have lands wherever the
+rest of it fits, and says nothing. Upstream's hunk for 0008 did that on 2026-09-29: its
+context is a case that CrossOver's `session_set_option` does not have yet, and it applied
+cleanly inside `connect_query_option`, where it stubbed nothing. `WinePatcher` passes `-F0`,
+so a hunk like that stops the build as one that applies to neither form of the tree. All
+eight patches applied to pristine 26.3.0 files with `-F0` exactly as they did without it.
+
 **A build with no patches is stopped rather than allowed.** Wine without them configures,
 compiles, installs and passes every check in this document. What it cannot do is start a
 game, and that is a long way downstream of here.

@@ -164,7 +164,9 @@ public struct WinePatcher: Sendable {
     private func runs(
         _ patch: WinePatch, on tree: URL, reversed: Bool, dryRun: Bool
     ) async throws -> Bool {
-        var arguments = ["-d", tree.path, "-p1", "-s", "-i", patch.url.path]
+        // No fuzz: with patch's default, a hunk whose outer context is not in this tree
+        // applies wherever the rest of it fits and reports success. See docs/wine-build.md.
+        var arguments = ["-d", tree.path, "-p1", "-F0", "-s", "-i", patch.url.path]
         // --force so that a reversed patch is reported in the exit status instead of
         // stopping to ask, which would hang a build with no terminal to answer it.
         if reversed { arguments += ["-R", "--force"] }

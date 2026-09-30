@@ -221,6 +221,34 @@ private func read(_ tree: URL) throws -> String {
     #expect(try read(tree) == "something\nelse\nentirely\n")
 }
 
+@Test func aHunkWhoseOuterContextIsMissingIsRefusedRatherThanFuzzedIn() async throws {
+    let root = temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let (tree, patches) = try makeTree(in: root, content: "one\ntwo\nthree\nfour\nfive\nsix\n")
+    // Upstream's hunk for 0008 had this shape against the 26.3.0 tree: the default fuzz
+    // drops the two outer lines of context and applies the rest wherever it fits.
+    try """
+        Its outer context is not in the tree.
+
+        --- a/dlls/ntdll/unix/loader.c
+        +++ b/dlls/ntdll/unix/loader.c
+        @@ -1,6 +1,7 @@
+         missing
+         absent
+         three
+        +inserted
+         four
+         five
+         six
+
+        """.write(to: patches.appending(path: "0001-fake.patch"), atomically: true, encoding: .utf8)
+
+    await #expect(throws: PatchError.doesNotApply(patch: "0001-fake.patch", tree: tree.path)) {
+        try await WinePatcher(directory: patches).apply(to: tree)
+    }
+    #expect(try read(tree) == "one\ntwo\nthree\nfour\nfive\nsix\n")
+}
+
 @Test func aStackOnOneFileIsRecognisedOnTheSecondRun() async throws {
     let root = temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
