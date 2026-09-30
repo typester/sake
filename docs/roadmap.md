@@ -118,6 +118,12 @@ and the argument suggestion is a heuristic for one launcher rather than a rule f
 Nothing yet knows that starting Diablo IV directly fails on the token — `runtime.md` says
 so, the app does not.
 
+**Titles run in Game Mode since 2026-09-23.** macOS decides it from the bundle a process's
+executable is in, and Wine's has none, so a title starts from `engine/SakeGame.app`, a copy
+of Wine's unix side, and `patches/0007` gives every program it starts a bundle of its own
+named after the program, carrying its icon. Diablo IV started from Battle.net shows as
+"Diablo IV" in the Dock and the Game Overlay. `runtime.md` has why each piece is there.
+
 ### Phase 4 — the GUI proper (under way)
 
 Setup flow, library, per-title configuration, uninstall. `layout.md` covers where things go

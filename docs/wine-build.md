@@ -58,8 +58,8 @@ Notes that cost time to find:
 
 ## The patches go in before configure
 
-`patches/` holds the changes sake makes to Wine's own code — six of them as of 2026-09-20,
-two in ntdll and four in winemac.drv, all LGPL-2.1-or-later rather than this repository's
+`patches/` holds the changes sake makes to Wine's own code — seven of them as of 2026-09-23,
+three in ntdll and four in winemac.drv, all LGPL-2.1-or-later rather than this repository's
 MIT. Two of the four are upstream Wine commits carried only until the CrossOver sources sake
 builds catch up with wine-11.11, one is the reference implementation attached to Wine bug
 60263, and the rest are sake's own; each file's header says which it is and where it came

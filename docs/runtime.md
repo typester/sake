@@ -189,9 +189,11 @@ Three things in that list defeat a naive process check:
   appears as `start.exe`, never as the game. That is precisely the case the "cut `argv[0]`
   at its first `.exe`" rule exists for, and it drops out as intended.
 - **wineserver does not spell itself `<engine>/bin/wineserver`.** `ps` shows
-  `<engine>/lib/wine/../../bin/wineserver`. A teardown check matching the tidy path matches
-  nothing and so reports success every time — sake's first version did exactly that, and
-  only a real run showed it.
+  `<engine>/lib/wine/../../bin/wineserver`, or, since titles start from a bundle,
+  `<engine>/SakeGame.app/Contents/MacOS/../../bin/wineserver`. A teardown check matching the
+  tidy path matches nothing and so reports success every time — sake's first version did
+  exactly that, and only a real run showed it. Both are under the engine, which is what the
+  check matches now.
 - **`--in-process-gpu` does not mean one process.** It folds the GPU into the browser
   process; the renderer and the two utility processes remain their own. Four
   `Battle.net.exe` is what a healthy run has.
@@ -207,11 +209,11 @@ and the renderer that draws it was still alive seventy-five seconds later.
 
 ## Two patches to ntdll
 
-sake carries six patches in `patches/`, all LGPL-2.1-or-later because all are derivatives of
-Wine. The two in ntdll are this section's; they came from the prototype unchanged and go in
-before configure. The four in winemac.drv arrived with Steam on 2026-09-20 and are in the
-Steam section below. The build side of patching is in `wine-build.md` and the licence side in
-`licensing.md`.
+sake carries seven patches in `patches/`, all LGPL-2.1-or-later because all are derivatives
+of Wine. The two in ntdll are this section's; they came from the prototype unchanged and go
+in before configure. The four in winemac.drv arrived with Steam on 2026-09-20 and are in the
+Steam section below. The seventh, in ntdll, is Game Mode's, and is in that section. The
+build side of patching is in `wine-build.md` and the licence side in `licensing.md`.
 
 **sake measured both on 2026-09-19**, against its own engine and bottle, the day it started
 carrying them. The prototype's numbers are kept beside sake's because they are the
@@ -310,6 +312,46 @@ points at that with no arguments at all — read out of
 directory and nothing else. So "start Diablo IV" as a title in sake need not mean starting
 `Diablo IV.exe`: it can mean starting the launcher Blizzard ships, which talks to the
 client the way the Play button does. **Untested** — the shortcut was read, not run.
+
+## Game Mode needs a bundle, and Wine has none
+
+macOS turns Game Mode on for a full-screen process whose bundle's `Info.plist` has
+`LSApplicationCategoryType` ending in `games`; there is no other key for it.
+`<engine>/bin/wine` has no bundle. So a title is started by
+`<engine>/SakeGame.app/Contents/MacOS/wine`, and `patches/0007` starts every program the
+title starts from a bundle of its own. Measured on 2026-09-23: Diablo IV started from
+Battle.net showed as "Diablo IV", with its icon, in the Dock and the Game Overlay, and went
+into Game Mode full-screen.
+
+**`SakeGame.app` holds a copy of Wine's unix side, not links to it.** A bundle that only
+`execv`s wine labels that one process: Wine starts every other from its own loader, which it
+finds from `realpath()` of `ntdll.so`. So `Contents/MacOS` is a 5.6 MB copy of
+`lib/wine/x86_64-unix`, and what Wine then looks for relative to it — the PE directories,
+`x86_64-unix` (a link to `.`), `external`, the dylibs, `share`, `bin` — is linked into the
+engine. `GameBundle` makes it when a title starts and leaves it alone while it matches.
+
+**`LSUIElement` is set**, or every process that touches the window server gets a blank Dock
+tile. Wine promotes a process with a window to a regular app itself, and sets its icon while
+doing so.
+
+**A program's bundle is `<engine>/SakePrograms/<key>/<program>.app`**, made by ntdll the
+first time it starts that program, when `SAKE_GAME_BUNDLES` is set — `TitleLauncher` sets it
+for titles only. It mirrors the parent's bundle with **hard links**, so `realpath()` stays
+inside it, and has an `Info.plist` of its own:
+
+- the Dock label is the bundle's file name and nothing else, so the file is named after the
+  exe;
+- `<key>` hashes the exe's path, and is in the identifier, so two games' `Launcher.exe` are
+  two bundles;
+- the exe's icon is written as `AppIcon.ico` before the first exec, because the Game Overlay
+  keeps what a bundle had when macOS first registered it;
+- CrossOver's Hack 22144 is skipped for it, since with `WINEDLLPATH` set it would move the
+  program back out.
+
+A stale bundle — a rebuilt engine, or no `SakeBundleFormat` 2 — is set aside as
+`<key>/.stale-<pid>` and made again; `GameBundle` sweeps those and `.staging-*` when a title
+starts. Use `lsappinfo`, not `lsof`, to see which bundle a process is in: with hard links
+`lsof` shows one path for all of them. `patches/0007`'s header has the measurements.
 
 ## Controllers need SDL2
 

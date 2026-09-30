@@ -108,7 +108,7 @@ unmounts it again. See `docs/licensing.md`.
 
 | | |
 |---|---|
-| `Sources/SakeKit/` | the layout, a subprocess runner, the preflight checks, the source fetcher, the prefix build, the Wine build, the patch step, the D3DMetal step, the bottle, the import, the installer, the titles, starting one, how big a tree is, and the uninstall |
+| `Sources/SakeKit/` | the layout, a subprocess runner, the preflight checks, the source fetcher, the prefix build, the Wine build, the patch step, the D3DMetal step, the bottle, the import, the installer, the titles, starting one, the bundle that puts it in Game Mode, how big a tree is, and the uninstall |
 | `Sources/sake/` | the SwiftUI app — two windows, kept thin |
 | `patches/` | the changes sake makes to Wine's own code — LGPL-2.1-or-later, not MIT; `patches/README.md` says where each came from |
 | `docs/` | how the thing actually has to work, what breaks when it doesn't, and how to play one game |

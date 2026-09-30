@@ -42,6 +42,14 @@ public struct Paths: Sendable, Equatable {
     /// beside it for i386: under WoW64 the unix side is x86_64 only.
     public var wineUnixLibraries: URL { engine.appending(path: "lib/wine/x86_64-unix") }
 
+    /// See ``GameBundle`` and docs/runtime.md.
+    public var gameBundle: URL { engine.appending(path: "SakeGame.app") }
+
+    /// `<key>/<program>.app` per program a title starts, keyed by a hash of the exe's path.
+    /// The patched ntdll makes these (`patches/0007`); sake only passes the directory as
+    /// `SAKE_GAME_BUNDLES`.
+    public var programBundles: URL { engine.appending(path: "SakePrograms") }
+
     /// `redist/lib` out of Apple's image, kept as the user's own copy so the toolkit does
     /// not have to stay mounted to put D3DMetal back after a rebuild. See docs/licensing.md
     /// for why keeping it is inside the line and shipping it is not.
