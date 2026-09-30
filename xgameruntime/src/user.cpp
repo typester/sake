@@ -9,6 +9,11 @@ constexpr uint32_t kForceRefresh = 0x1;
 constexpr uint64_t kPlaceholderXuid = 1;
 // A token closer to its expiry than this is fetched again rather than handed out.
 constexpr uint64_t kMarginSeconds = 5 * 60;
+// A ForceRefresh goes to sake only this long after an ask of it last ended. XSAPI puts the
+// option on the person's next token request after any 401, whatever its URL, and a refusal
+// no new token cures, such as multiplayer activity's missing title claim, comes back every
+// time.
+constexpr ULONGLONG kForceRefreshAfterMs = 15 * 60'000;
 const char* const kIdentity = "http://xboxlive.com";
 
 const void* const kAddIdentity = &kAddIdentity;
@@ -36,6 +41,7 @@ struct Person {
 };
 
 Person g_person;
+std::atomic<ULONGLONG> g_askEndedAt{0};
 
 bool IsUser(XUserHandle user) noexcept
 {
@@ -117,8 +123,16 @@ HRESULT RequestToken(XAsyncBlock* async, const void* identity, const char* name,
                      Payload::Kind kind) noexcept
 {
     Refresh();
+    bool force = (options & kForceRefresh) != 0;
+    ULONGLONG ended = g_askEndedAt;
+    ULONGLONG since = GetTickCount64() - ended;
+    if (force && ended != 0 && since < kForceRefreshAfterMs) {
+        Log("token for %s: ForceRefresh %llu s after the last ask of sake ended, not asking again", url.c_str(),
+            static_cast<unsigned long long>(since / 1000));
+        force = false;
+    }
     std::string authorization;
-    Lookup found = (options & kForceRefresh) ? Lookup::Missing : LookUp(url, authorization);
+    Lookup found = force ? Lookup::Missing : LookUp(url, authorization);
     if (found == Lookup::NotCovered) {
         Log("token for %s: no relying party covers it", url.c_str());
         return CompleteNow(async, identity, name, E_GAMEUSER_NO_TOKEN_REQUIRED, {});
@@ -129,6 +143,7 @@ HRESULT RequestToken(XAsyncBlock* async, const void* identity, const char* name,
     }
     Log("token for %s: asking sake", url.c_str());
     return AskSake(async, identity, name, [url, kind](const char* state, Payload& payload) noexcept -> HRESULT {
+        g_askEndedAt = GetTickCount64();
         if (strcmp(state, "signed-in") != 0)
             return E_GAMEUSER_RESOLVE_USER_ISSUE_REQUIRED;
         Refresh();

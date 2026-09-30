@@ -133,10 +133,12 @@ shape it is named, and everything else is here because the service accepted it.
   to the device's key and bound to nothing. A relying party is spelled as the table spells
   it: PlayFab's without its trailing slash was a 400.
 - **No title token, so no title table.** `title.auth.xboxlive.com` answered 403 with an empty
-  body, and SISU's `/authorize` 401, presumably wanting a session from its `/authenticate`,
-  which wants a registered redirect again. The title's own table answers 414 to `?type=1`
-  with or without a token. Without the query it is 401 to nobody and 403 to every XSTS token
-  above, none of which was minted with a title token.
+  body, and SISU's `/authorize` 401. Until 2026-09-30 this said `/authorize` presumably wanted
+  a session from `/authenticate`, which would want a registered redirect; `/authenticate` hands
+  out a session without one, and `/authorize` refuses the device code's token with it too
+  (below). The title's own table answers 414 to `?type=1` with or without a token. Without the
+  query it is 401 to nobody and 403 to every XSTS token above, none of which was minted with a
+  title token.
 - **Where a signature is checked.** `title.mgt.xboxlive.com` refused a key-bound token sent
   unsigned or with a corrupted signature, 401 `invalid_request_signature`, and got as far as
   its 403 for a token bound to nothing sent unsigned. `profile.xboxlive.com` read the person's
@@ -290,6 +292,21 @@ the owner's Windows PC, where Steam runs the same game on Gaming Services.
   same service, and the game servers PlayFab's. Joining a party by code worked both ways with
   the game on a Nintendo Switch 2, and with the Mac hosting, the two played a mission together.
 
+Later on 2026-09-30 the runtime took `ForceRefresh` to sake only when no ask had ended in the
+last 15 minutes (The design), and the game was run again in the `ex` bottle.
+
+- **Before, every one went to sake.** In the day's nine runs of the game on sake's runtime,
+  112 token requests went to sake: the first run's sign-in, and 111 with `ForceRefresh`,
+  every one for `multiplayeractivity.xboxlive.com`. Each wave of those cost a silent sign-in
+  that rewrote the session and the kept sign-in: in the 1.9 minutes of the last run, 26
+  requests in six sign-ins, 4 to 23 seconds apart and 2.0 to 3.5 seconds each.
+- **After, one did.** The owner went into the game's world and walked around, and nothing
+  looked different. In the 2.5 minutes of the run, eleven token requests carried
+  `ForceRefresh`, all for `multiplayeractivity.xboxlive.com`: the seven of the first wave went
+  to sake together and cost one silent sign-in of 2.5 seconds, and the four that came 21 and
+  24 seconds after it were answered from the session. The session and the kept sign-in were
+  written once.
+
 ## WineGDK
 
 `Weather-OS/WineGDK` implements `xgameruntime` inside Wine 11.14. Its author declares their
@@ -366,10 +383,17 @@ five more minutes, and otherwise with a placeholder, XUID 1, the way the stand-i
 which takes the XUID the game then adds by ID. After it, the runtime sends the one
 `SignedInAgain` and, on every registration for connectivity changes, the initial
 notification, both as the stand-in does (above). A token request looks the URL's host up in
-the session; a token that is missing, lasts less than five minutes or is asked for with
-`ForceRefresh` sends the runtime to sake, and a URL no relying party covers gets
-`E_GAMEUSER_NO_TOKEN_REQUIRED`. Every answer is completed inside `XAsyncBegin` or from the
-runtime's own thread, never from the caller's queue.
+the session; a token that is missing or lasts less than five minutes sends the runtime to
+sake, and a URL no relying party covers gets `E_GAMEUSER_NO_TOKEN_REQUIRED`. `ForceRefresh`
+sends it to sake as well, unless an earlier ask ended in the last 15 minutes, whatever its
+answer; then the request is answered as if the option were not there. XSAPI puts that option
+on the person's next token request after any 401, whatever its URL, and retries the refused
+call once (`Source/Shared/http_call_wrapper_internal.cpp` and `user.cpp` in Microsoft's
+xbox-live-api, read 2026-09-30), so a refusal no new token cures, such as multiplayer
+activity's, had cost a silent sign-in every few seconds (above); and since the option can ride
+on another service's request, what it gets is the session's token rather than a failure. Every
+answer is completed inside `XAsyncBegin` or from the runtime's own thread, never from the
+caller's queue.
 
 **What sake keeps.** The refresh token and the device, in `~/Library/Sake/sign-ins`, one file
 per app ID, readable by the person alone: not the Keychain, which asks for the login password
@@ -438,8 +462,9 @@ The refresh token stays out of the bottle.
 - ~~**Multiplayer activity.**~~ **Answered on 2026-09-30**, above: it wants a title Id claim,
   so a title token, and sake has none: XAST refuses the device code's token, so does SISU's
   `/authorize`, and SISU's page wants a redirect this app has not registered. Each refusal
-  still costs a silent sign-in through sake, because the runtime takes a `ForceRefresh` at its
-  word. The game is played without it, and with others by party code.
+  cost a silent sign-in through sake until later that day, when the runtime stopped taking
+  every `ForceRefresh` at its word (The design). The game is played without it, and with
+  others by party code.
 - **Linking a Steam account PlayFab does not know yet.** Unlinking and linking again works
   since 2026-09-30 (above), with PlayFab's token bound to the device the way the stand-in's
   README asks; a PlayFab token bound to nothing was not tried, and neither was an account
