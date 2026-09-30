@@ -1,0 +1,105 @@
+ntdll: leave AppleDouble files out of directory listings.
+
+On a volume that cannot store extended attributes itself, macOS keeps a file's
+attributes in a second file beside it, named "._" followed by the file's own name.
+exFAT is such a volume. On the machine this was measured on, a file got one as soon as it
+was written, because macOS tags what applications write with com.apple.provenance; the
+bottle below held 6,259. readdir() returns these companions like any other name, so a
+Windows program listing a directory takes them for files of its own.
+
+Measured in sake on 2026-09-30, in a bottle whose drive_c is on an exFAT disk.
+Minecraft Dungeons II lists its SaveGames directory with FindFirstFileExW("*.*"), and
+the sorted listing puts "._GlobalSaveDataDefault.sav" before
+"GlobalSaveDataDefault.sav". The game opened the first, read its 4096 bytes and never
+opened the second, then said its settings file was damaged and reset every setting.
+It did that on every launch, because macOS writes the companion again as soon as the
+game saves. With the companions removed by hand the same settings file loaded, and the
+next save brought them back. Steam's client in that bottle had been syncing
+"._sharedconfig.vdf" to Steam Cloud as a configuration file.
+
+A "._X" is left out only when an "X" is beside it and the volume's capabilities say it
+has no native extended attributes (VOL_CAP_INT_EXTENDED_ATTR), which is when macOS
+makes one. On APFS a "._X" is an ordinary file, and one with no "X" belongs to nothing,
+so both stay visible and deletable. A name asked for exactly, with no wildcard, is
+found as before. WINEDEBUG=+file names each one left out.
+
+--- a/dlls/ntdll/unix/file.c
++++ b/dlls/ntdll/unix/file.c
+@@ -2637,8 +2637,57 @@
+     return STATUS_SUCCESS;
+ }
+ 
++
++#if defined(HAVE_GETATTRLIST) && defined(ATTR_VOL_CAPABILITIES) && \
++    defined(VOL_CAPABILITIES_FORMAT) && defined(VOL_CAP_FMT_CASE_SENSITIVE) && \
++    defined(VOL_CAP_INT_EXTENDED_ATTR)
+ 
+ /***********************************************************************
++ *           is_appledouble_file
++ *
++ * Checks whether a name in the current directory is an AppleDouble file: "._X" beside
++ * an "X", on a volume that cannot store extended attributes itself, where macOS keeps
++ * X's attributes in that file. native_xattr holds the volume's answer for one listing,
++ * -1 until it has been asked.
++ */
++static BOOL is_appledouble_file( const char *name, int *native_xattr )
++{
++    struct attrlist attr;
++    struct vol_caps caps;
++    struct statfs stfs;
++    struct stat st;
++
++    if (name[0] != '.' || name[1] != '_' || !name[2]) return FALSE;
++
++    if (*native_xattr == -1)
++    {
++        memset( &attr, 0, sizeof(attr) );
++        attr.bitmapcount = ATTR_BIT_MAP_COUNT;
++        attr.volattr = ATTR_VOL_INFO | ATTR_VOL_CAPABILITIES;
++        /* getattrlist() only answers for volume attributes at the volume's root */
++        if (statfs( ".", &stfs ) == -1 ||
++            getattrlist( stfs.f_mntonname, &attr, &caps, sizeof(caps), 0 ) == -1 ||
++            caps.size != sizeof(caps) ||
++            !(caps.caps.valid[VOL_CAPABILITIES_INTERFACES] & VOL_CAP_INT_EXTENDED_ATTR))
++            *native_xattr = 1;
++        else
++            *native_xattr = !!(caps.caps.capabilities[VOL_CAPABILITIES_INTERFACES] &
++                               VOL_CAP_INT_EXTENDED_ATTR);
++    }
++    return !*native_xattr && !lstat( name + 2, &st );
++}
++
++#else
++
++static BOOL is_appledouble_file( const char *name, int *native_xattr )
++{
++    return FALSE;
++}
++
++#endif
++
++
++/***********************************************************************
+  *           read_directory_readdir
+  *
+  * Read a directory using the POSIX readdir interface; helper for NtQueryDirectoryFile.
+@@ -2648,6 +2697,7 @@
+     struct dirent *de;
+     NTSTATUS status = STATUS_NO_MEMORY;
+     DIR *dir = opendir( "." );
++    int native_xattr = -1;
+ 
+     if (!dir) return STATUS_NO_SUCH_FILE;
+ 
+@@ -2656,6 +2706,11 @@
+     while ((de = readdir( dir )))
+     {
+         if (!strcmp( de->d_name, "." ) || !strcmp( de->d_name, ".." )) continue;
++        if (is_appledouble_file( de->d_name, &native_xattr ))
++        {
++            TRACE( "leaving out %s\n", debugstr_a(de->d_name) );
++            continue;
++        }
+         if (!append_entry( data, de->d_name, NULL, mask )) goto done;
+     }
+     status = STATUS_SUCCESS;

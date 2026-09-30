@@ -207,12 +207,13 @@ and the renderer that draws it was still alive seventy-five seconds later.
 
 ## Two patches to ntdll
 
-sake carries eight patches in `patches/`, all LGPL-2.1-or-later because all are derivatives
-of Wine. The two in ntdll are this section's; they came from the prototype unchanged and go
-in before configure. The four in winemac.drv arrived with Steam on 2026-09-20 and are in the
-Steam section below, and the two in winhttp arrived with Minecraft Dungeons II on 2026-09-29
-and are in the GDK section after it. The build side of patching is in `wine-build.md` and
-the licence side in `licensing.md`.
+sake carries nine patches in `patches/`, all LGPL-2.1-or-later because all are derivatives
+of Wine. Two of the three in ntdll are this section's; they came from the prototype unchanged
+and go in before configure. The four in winemac.drv arrived with Steam on 2026-09-20 and are
+in the Steam section below, the two in winhttp arrived with Minecraft Dungeons II on
+2026-09-29 and are in the GDK section after it, and the third in ntdll came with the same
+game a day later and has the exFAT section after that. The build side of patching is in
+`wine-build.md` and the licence side in `licensing.md`.
 
 **sake measured both on 2026-09-19**, against its own engine and bottle, the day it started
 carrying them. The prototype's numbers are kept beside sake's because they are the
@@ -478,6 +479,48 @@ game is the sign-in going through with both of the stand-in's hooks removed, whi
 the rebuilt engine: Microsoft's sign-in, then `LoginWithSteam`, then character select, with
 every reply the stand-in logged, 20 of them, a 200 and no option refused.
 
+## A bottle on exFAT: the `._` files macOS writes are not the game's
+
+Measured in sake on 2026-09-30 in the `ex` bottle, a symlink into a directory on an exFAT
+disk, with Minecraft Dungeons II started through Steam. The game had reset its settings on
+every launch since 2026-09-29, with the community stand-in and with sake's own runtime alike.
+
+**macOS writes a second file beside nearly every file there.** exFAT cannot store extended
+attributes itself — `getattrlist` reports `VOL_CAP_INT_EXTENDED_ATTR` unset for that disk and
+set for the internal APFS volume — so macOS keeps a file's attributes in a 4096-byte
+AppleDouble file named `._` and the file's own name. On this Mac a file is given one as soon as
+it is written, because it is given `com.apple.provenance`: the game's saves were, and so was a
+file written from a shell. The bottle held 6,259 of them. Wine lists these as ordinary files,
+marked hidden because their names start with a dot, and its sorted listing puts each before
+the file it belongs to.
+
+**The game read one as its settings.** It lists `Saved\SaveGames\*.*`, opened
+`._GlobalSaveDataDefault.sav`, read its 4096 bytes and never opened `GlobalSaveDataDefault.sav`
+at all. It then showed SETTINGS FILE DAMAGED and sent the person through the initial setup
+again, although the file it had written is sound: JSON with every byte one lower. With the
+five companions in `SaveGames` removed by hand, the same file loaded and the game went
+straight to play; its next save brought all five back. Steam's client in that bottle had been
+syncing `._sharedconfig.vdf` to Steam Cloud as one of its configuration files: its
+`logs/cloud_log.txt` reports it in sync nine times before the patch.
+
+**`patches/0009` leaves such a file out of a directory listing** when the file it belongs to is
+beside it and the volume has no native extended attributes. A `._` file on APFS, or one with
+nothing beside it, is still listed, and a name asked for exactly is still found.
+
+**How to tell it worked.** `WINEDEBUG=+file` prints `leaving out` and the name for each file
+left out, and the listing after it holds none of them. On the rebuilt engine, the same day and
+with the five companions back on disk, the game's listing of `SaveGames` left them out and
+returned the five saves, it read `GlobalSaveDataDefault.sav`, and it started with no dialog.
+Steam's next sync named `sharedconfig.vdf` alone and found nothing to download. In
+`wine cmd /c dir`, a `._` file with nothing beside it on the exFAT disk and a `._` file on APFS
+were both listed, and `rmdir /s /q` removed an exFAT directory holding two companions it had
+not been shown, since macOS removes a companion with its file. Starting `cmd` in that bottle
+left out 854 names.
+
+Not measured: FAT and SMB volumes, which macOS treats the same way when they lack native
+extended attributes, and whether Steam ever removes the copy of `._sharedconfig.vdf` its
+cloud still holds.
+
 ## Killing wineserver leaves the prefix's own services running
 
 **Measured in sake on 2026-09-20.** A title was started from the library and stopped again.
@@ -623,6 +666,11 @@ started. Cut `argv[0]` at its first `.exe` and check what that ends with.
 - **`WINEDEBUG=+pid` before anything else with more than one process.** Without it every
   trace prefix is a thread id, and four Chromium processes cannot be told apart. Learned on
   Steam, 2026-09-20.
+- **`WINEDEBUG=<program>:+<channel>` traces one process.** An option with a name and a colon in
+  front applies only where the executable has that name (`parse_options` in
+  `dlls/ntdll/unix/debug.c`), so a game started by Steam can be traced without Steam's own
+  processes. `-all,Dungeons-Win64-Shipping.exe:+pid,Dungeons-Win64-Shipping.exe:+file` in
+  Steam's environment gave 24 MB by the time the game showed its first dialog, 2026-09-30.
 - **`+macdrv_d3dmtl` is D3DMetal's half of the conversation.** It is the channel of the glue
   in `dlls/winemac.drv/d3dmetal.c`, the only code D3DMetal calls in Wine. A `get_win_data`
   with no `create_metal_device` after it means winemac returned NULL, and the six calls of a

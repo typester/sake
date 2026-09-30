@@ -139,7 +139,7 @@ private func read(_ tree: URL) throws -> String {
     try String(contentsOf: tree.appending(path: "dlls/ntdll/unix/loader.c"), encoding: .utf8)
 }
 
-@Test func theRepositoryCarriesTheEightPatchesAndSaysTheyAreNotMIT() throws {
+@Test func theRepositoryCarriesTheNinePatchesAndSaysTheyAreNotMIT() throws {
     let patcher = WinePatcher(directory: repositoryPatches)
     let patches = try patcher.patches()
 
@@ -152,6 +152,7 @@ private func read(_ tree: URL) throws -> String {
         "0006-winemac-give-D3DMetal-a-hosted-swapchain-for-a-window-it-does-not-own.patch",
         "0007-winhttp-stub-WINHTTP_OPTION_DECOMPRESSION.patch",
         "0008-winhttp-stub-WINHTTP_OPTION_IPV6_FAST_FALLBACK.patch",
+        "0009-ntdll-leave-AppleDouble-files-out-of-directory-listings.patch",
     ])
     // Each one says what it does on its first line, which is where the reasoning starts,
     // and names the module it changes the way a Wine commit does.

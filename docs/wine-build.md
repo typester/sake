@@ -58,8 +58,8 @@ Notes that cost time to find:
 
 ## The patches go in before configure
 
-`patches/` holds the changes sake makes to Wine's own code — eight of them as of 2026-09-29,
-two in ntdll, four in winemac.drv and two in winhttp, all LGPL-2.1-or-later rather than this
+`patches/` holds the changes sake makes to Wine's own code — nine of them as of 2026-09-30,
+three in ntdll, four in winemac.drv and two in winhttp, all LGPL-2.1-or-later rather than this
 repository's MIT. Four are upstream Wine commits carried only until the CrossOver sources
 sake builds catch up — two of the winemac.drv ones with wine-11.11, the winhttp ones with
 wine-11.4 and wine-11.7 — one is the reference implementation attached to Wine bug 60263,
@@ -92,7 +92,8 @@ rest of it fits, and says nothing. Upstream's hunk for 0008 did that on 2026-09-
 context is a case that CrossOver's `session_set_option` does not have yet, and it applied
 cleanly inside `connect_query_option`, where it stubbed nothing. `WinePatcher` passes `-F0`,
 so a hunk like that stops the build as one that applies to neither form of the tree. All
-eight patches applied to pristine 26.3.0 files with `-F0` exactly as they did without it.
+eight patches applied to pristine 26.3.0 files with `-F0` exactly as they did without it, and
+so did 0009 when it was added on 2026-09-30.
 
 **A build with no patches is stopped rather than allowed.** Wine without them configures,
 compiles, installs and passes every check in this document. What it cannot do is start a
