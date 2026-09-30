@@ -55,6 +55,7 @@ final class AppModel {
     var prefix: [String: PrefixStatus] = [:]
     var wine: WineStatus?
     var d3dMetal: D3DMetalStatus?
+    var gdkRuntime: GDKRuntimeStatus?
 
     /// Keyed by bottle name, the way `sources` and `prefix` are keyed by component: the
     /// wizard watches `default` while the library may be making another one.
@@ -130,6 +131,7 @@ final class AppModel {
     let building = Run()
     let buildingWine = Run()
     let installing = Run()
+    let buildingRuntime = Run()
     let creating = Run()
     let changingBottle = Run()
     let importing = Run()
@@ -202,6 +204,7 @@ final class AppModel {
         case .prefix: building.isRunning
         case .wine: buildingWine.isRunning
         case .d3dMetal: installing.isRunning
+        case .gdkRuntime: buildingRuntime.isRunning
         case .bottle: creating.isRunning
         }
     }
@@ -222,6 +225,9 @@ final class AppModel {
         case .d3dMetal:
             installing.start({ for await e in D3DMetalInstaller(paths: self.paths).install() { self.apply(e) } },
                              then: survey)
+        case .gdkRuntime:
+            buildingRuntime.start({ for await e in GDKRuntimeBuilder(paths: self.paths).build() { self.apply(e) } },
+                                  then: survey)
         case .bottle:
             create(Bottle.defaultName)
         }
@@ -234,6 +240,7 @@ final class AppModel {
         case .prefix: building.stop()
         case .wine: buildingWine.stop()
         case .d3dMetal: installing.stop()
+        case .gdkRuntime: buildingRuntime.stop()
         case .bottle: creating.stop()
         }
     }
@@ -260,6 +267,7 @@ final class AppModel {
         if installer.isInstalled {
             d3dMetal = .alreadyInstalled(version: installer.installedVersion())
         }
+        if GDKRuntimeBuilder(paths: paths).isBuilt { gdkRuntime = .alreadyBuilt }
 
         bottles = Bottle.all(in: paths)
         for bottle in bottles where bottleStatus[bottle.name] == nil {
@@ -467,6 +475,19 @@ final class AppModel {
             if case .working(let phase, _) = d3dMetal { d3dMetal = .working(phase: phase, item: item) }
         case .installed(let version): d3dMetal = .installed(version: version)
         case .failed(let reason): d3dMetal = .failed(reason)
+        case .finished: break
+        }
+    }
+
+    private func apply(_ event: GDKRuntimeEvent) {
+        switch event {
+        case .alreadyBuilt: gdkRuntime = .alreadyBuilt
+        case .started: gdkRuntime = .working(phase: "starting", line: "")
+        case .phase(let phase): gdkRuntime = .working(phase: phase.rawValue, line: "")
+        case .output(let line):
+            if case .working(let phase, _) = gdkRuntime { gdkRuntime = .working(phase: phase, line: line) }
+        case .built: gdkRuntime = .built
+        case .failed(let reason, _): gdkRuntime = .failed(reason)
         case .finished: break
         }
     }
@@ -722,6 +743,7 @@ final class AppModel {
         prefix = [:]
         wine = nil
         d3dMetal = nil
+        gdkRuntime = nil
         bottleStatus = [:]
         bottleSizes = [:]
         titleStatus = [:]

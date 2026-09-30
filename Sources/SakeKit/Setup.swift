@@ -8,6 +8,7 @@ public enum SetupStep: String, CaseIterable, Sendable, Identifiable {
     case prefix
     case wine
     case d3dMetal
+    case gdkRuntime
     case bottle
 
     public var id: String { rawValue }
@@ -28,9 +29,11 @@ public enum StepState: Sendable, Equatable {
 /// wizard makes; what is left there is a window and a button.
 public struct Setup: Sendable {
     private let paths: Paths
+    private let runtimeSources: URL?
 
-    public init(paths: Paths = .default) {
+    public init(paths: Paths = .default, runtimeSources: URL? = GDKRuntimeBuilder.bundled) {
         self.paths = paths
+        self.runtimeSources = runtimeSources
     }
 
     static let machineNotReady = "This Mac is not ready yet."
@@ -68,6 +71,10 @@ public struct Setup: Sendable {
             return state(D3DMetalInstaller(paths: paths).isInstalled,
                          D3DMetalInstaller(paths: paths).missingPrerequisite,
                          machineIsReady)
+
+        case .gdkRuntime:
+            let builder = GDKRuntimeBuilder(paths: paths, sources: runtimeSources)
+            return state(builder.isBuilt, builder.missingPrerequisite, machineIsReady)
 
         case .bottle:
             let builder = BottleBuilder(paths: paths)

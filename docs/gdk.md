@@ -6,9 +6,10 @@ and its tokens. Wine has neither. This file is how sake means to provide both it
 runtime DLL it builds, and a sign-in it performs. **Both exist, and Minecraft Dungeons II
 reached character select with them and nothing else on 2026-09-30: the runtime, in
 `xgameruntime/`, asks sake to sign the person in when the game first wants a token, sake does
-it through files in the bottle, and the runtime hands the game its user and tokens. The app
-does not yet build or place the runtime.** What was measured says so and gives the date; the
-rest is a decision or an open question.
+it through files in the bottle, and the runtime hands the game its user and tokens. Later that
+day the app built the runtime in setup and put it in the bottle itself, and the game reached
+character select again.** What was measured says so and gives the date; the rest is a
+decision or an open question.
 
 ## What was measured
 
@@ -237,6 +238,25 @@ a placeholder until there is a session, and sake asked at the first token reques
   cannot see. The stand-in's failed, with an error of its own, and neither run needed them
   for character select.
 
+Later on 2026-09-30 the app built the runtime and placed it itself: the GDK Runtime step in
+setup, then Steam started from sake in the `ex` bottle.
+
+- **The step** took under five seconds from the button to a runtime in the engine, most of it
+  fetching libHttpClient's 3.5 MB. The archive hashed as it had on 2026-09-29, and what it
+  unpacked to matched, file for file, the tree unpacked from it then. The DLL carries no path
+  from the person's home: libHttpClient is compiled by absolute path, and `__FILE__` had put
+  five of those paths into the hand build, which the Makefile now maps to `libHttpClient`. The
+  82 `/Users/runner/…` paths still in it are where llvm-mingw built its own libraries.
+- **A copy that is not sake's.** With the stand-in's copy in `system32`, starting Steam from
+  sake left it alone and said so in the title's log; it hashed as before, and nothing was
+  written beside it.
+- **sake's own.** With the stand-in's three copies set aside, the next start put sake's copy
+  and libHttpClient's licence in `system32`, the copy hashing as the engine's does. Steam's
+  client loaded none of it: the runtime's log had no new line 40 seconds after Steam started.
+  Minecraft Dungeons II's launcher and game both loaded `C:\windows\system32\xgameruntime.dll`,
+  and with the sign-in kept the game reached character select, every token from the session.
+  The start after that found the copy already there.
+
 ## WineGDK
 
 `Weather-OS/WineGDK` implements `xgameruntime` inside Wine 11.14. Its author declares their
@@ -263,12 +283,35 @@ IDs and the order of their slots.
 ## The design
 
 **A runtime sake builds.** sake's own `xgameruntime.dll`, C++, built with the engine's
-toolchain outside Wine's build and put in a GDK title's bottle. It is not a Wine patch: it
-replaces no Wine code. It lives in `xgameruntime/`: the task queue and `XAsync` are
-libHttpClient's, compiled unmodified from a pinned commit; the IDs and slot order are
-WineGDK's, each checked against the title's thunks; the rest, `XUser` included, is written
-there. This paragraph used to make WineGDK's implementation the starting point, which would
-have taken Microsoft's code at second hand under a header that is not its own.
+toolchain outside Wine's build. It is not a Wine patch: it replaces no Wine code. It lives in
+`xgameruntime/`: the task queue and `XAsync` are libHttpClient's, compiled unmodified from a
+pinned commit; the IDs and slot order are WineGDK's, each checked against the title's thunks;
+the rest, `XUser` included, is written there. This paragraph used to make WineGDK's
+implementation the starting point, which would have taken Microsoft's code at second hand
+under a header that is not its own.
+
+**Where it goes.** Setup builds it, in a step of its own, from the copy of `xgameruntime/`
+inside Sake.app, and keeps it in the engine with libHttpClient's licence beside it. Before sake
+starts a title or an installer in any bottle, it puts both in that bottle's `system32`, the one
+place the launcher looks (above). Every bottle, and not only the ones a `MicrosoftGame.config`
+is found in, which is what this file planned until 2026-09-30: sake starts Steam before Steam
+installs the game, so at the only moment sake can put anything there, there is no config to
+find; and nothing but a GDK title loads the DLL. A copy of sake's own is replaced when it
+differs from the engine's, and a copy that is not sake's, such as the community stand-in, is
+left where it is; sake tells the two apart by a string its build carries. The step counts as
+done only while the engine's copy was built from the source that Sake.app carries, so an
+update that changes the runtime sends the person back to it.
+
+An installer is given it too, because Steam's can start Steam as it finishes, and a game
+installed in that Steam never passes through sake's Play; that has not been tried in sake. A
+copy is written beside the one it replaces and renamed over it, so nothing ever reads half a
+DLL. On APFS a game that has the old one loaded keeps it; on exFAT, where the `ex` bottle is,
+what that rename does under a running game has not been measured, and sake cannot yet see
+what runs in a symlinked bottle (issue #15) to wait for it. libHttpClient is fetched by the
+step itself rather than with the other sources, so that nothing else in setup waits on it, and
+it is checked by what it unpacks to (below). The engine is one per Mac, so two copies of sake
+that carry different runtime source each take the other's build for stale and build their own
+again; only a development build run beside a release does that.
 
 **A sign-in in the app, started by the game.** It looks like the stand-in's (above): the
 person signs in when the game does, in the browser, rather than before it starts. The runtime
@@ -362,9 +405,13 @@ The refresh token stays out of the bottle.
   and each refusal costs a silent refresh through sake (above), because the runtime takes a
   `ForceRefresh` at its word. Neither run needed the service, and the stand-in's calls to it
   failed too.
-- **How to pin libHttpClient.** The tarball GitHub generates for the commit hashed the same an
-  hour apart on 2026-09-29, but GitHub does not promise that; SakeKit may have to pin the
-  commit itself.
+- ~~**How to pin libHttpClient.**~~ **Answered on 2026-09-30**: by what it unpacks to. GitHub's
+  page on downloading source code archives, read that day, promises that an archive of a
+  commit ID always has the same files, and not the same bytes: the compression may change,
+  with six months' notice. A hash of the archive would be a way for setup to stop one day with
+  nothing wrong, so SakeKit hashes the unpacked tree instead, the path and contents of every
+  file in it that is not hidden, and compares that with the hash it carries. The archive
+  hashed the same that day all the same, the third time in two days.
 - **What stops the game before this matters.** The launcher's Gaming Services check is
   answered by the runtime (above). The VC++ false positive is still open: the `ex` bottle gets
   past it with a DLL override sake does not set.
@@ -384,6 +431,9 @@ The refresh token stays out of the bottle.
    good and with a placeholder the way the stand-in does when it is not, and the sign-in
    starts at the first token request.
 4. **SakeKit builds and places the runtime**: `xgameruntime/` compiled with the engine's
-   toolchain, libHttpClient fetched as a pinned source, and the DLL put in the `system32` of a
-   bottle whose title has a `MicrosoftGame.config`. Last, because the steps before it need
-   nothing from it.
+   toolchain, and libHttpClient fetched as a pinned source. Last, because the steps before it
+   need nothing from it. **Done on 2026-09-30** (above): a setup step builds it, and sake puts
+   it in every bottle before a start rather than only in a bottle whose title has a
+   `MicrosoftGame.config`, which is what this item said until then; The design says why. A
+   first install through Steam, which is the reason, has not been run, since the game was
+   installed already.

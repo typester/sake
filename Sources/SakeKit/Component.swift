@@ -22,7 +22,8 @@ public struct Component: Sendable, Identifiable, Equatable {
 
     /// `nil` where there is no known-good hash to compare against. CrossOver's tarball is
     /// the standing case — no copy of it survived in the prototype to hash — and any
-    /// version the user picks that nobody has hashed lands here too.
+    /// version the user picks that nobody has hashed lands here too. libHttpClient is `nil`
+    /// for another reason: what it unpacks to is checked instead, by ``GDKRuntimeBuilder``.
     public let sha256: String?
 
     public let archive: Archive
@@ -188,4 +189,20 @@ extension Component {
     /// The PE compiler, which Wine's configure finds under its `x86_64-w64-mingw32-gcc`
     /// name -- a symlink to a clang wrapper, so mingw-w64's own GCC is never needed.
     public static var llvmMinGW: Component { named("llvm-mingw") }
+
+    /// Microsoft's task queue and `XAsync`, compiled into sake's GDK runtime.
+    ///
+    /// Not in ``all``: the GDK Runtime step fetches it, so the rest of setup never waits on
+    /// it. GitHub promises the files inside an archive of a commit and not the bytes of the
+    /// archive, so it is pinned by what it unpacks to. See docs/gdk.md.
+    public static let libHttpClient = Component(
+        id: "libhttpclient",
+        version: "7ead73f6",
+        url: URL(string: "https://github.com/microsoft/libHttpClient/archive/7ead73f6389271c2dc2cb10cdafcc587b899bd8a.tar.gz")!,
+        sha256: nil,
+        archive: .tarGz,
+        destination: .sources,
+        unpacked: "libHttpClient-7ead73f6389271c2dc2cb10cdafcc587b899bd8a",
+        members: []
+    )
 }

@@ -102,8 +102,10 @@ stops being tested.
 
 `xgameruntime/` is not Swift and SwiftPM does not build it: it is the Windows DLL that GDK
 titles load in place of Gaming Services, C++ compiled with the engine's llvm-mingw by its own
-`Makefile`, and its `README.md` has the commands. `scripts/test.sh` does not reach it; a
-title in a bottle is what tests it, and `docs/gdk.md` records what that measured.
+`Makefile`. `scripts/build-app.sh` copies it into the bundle, and setup runs that `Makefile`
+from there; its `README.md` has the commands for a build by hand. `scripts/test.sh` runs the
+`Makefile` with a stand-in compiler, which pins the variables the app hands it and nothing the
+C++ does; a title in a bottle is what tests that, and `docs/gdk.md` records what it measured.
 
 ## Deployment target
 

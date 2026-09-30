@@ -67,6 +67,10 @@ cp "${BUILD_DIR}/sake" "${APP_DIR}/Contents/MacOS/"
 # top of the repository says and Sources/SakeKit/Resources would hide.
 cp -R "${PROJECT_ROOT}/patches" "${APP_DIR}/Contents/Resources/"
 
+# The GDK runtime's source, which setup compiles with the engine's own compiler. It is C++
+# with a Makefile of its own, not something SwiftPM builds.
+cp -R "${PROJECT_ROOT}/xgameruntime" "${APP_DIR}/Contents/Resources/"
+
 cp "${PROJECT_ROOT}/assets/Sake.icns" "${APP_DIR}/Contents/Resources/"
 
 sed "s/VERSION_PLACEHOLDER/${VERSION}/g" "${PROJECT_ROOT}/Info.plist.template" > "${APP_DIR}/Contents/Info.plist"

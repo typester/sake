@@ -18,6 +18,8 @@ import Testing
     #expect(paths.wineBuild.path == "/tmp/cache/build/wine")
     #expect(paths.wineUnixLibraries.path == "/tmp/support/engine/lib/wine/x86_64-unix")
     #expect(paths.d3dMetalFramework.path == "/tmp/support/engine/lib/external/D3DMetal.framework")
+    #expect(paths.gdkRuntime.path == "/tmp/support/engine/lib/xgameruntime")
+    #expect(paths.gdkRuntimeBuild.path == "/tmp/cache/build/xgameruntime")
     #expect(paths.bottle(named: "default").path == "/tmp/support/bottles/default")
 }
 

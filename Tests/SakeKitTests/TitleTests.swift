@@ -148,6 +148,27 @@ private func collect(_ stream: AsyncStream<LaunchEvent>) async -> [LaunchEvent] 
     #expect(log.contains("=== launch Battle.net.exe --use-gl=angle"))
 }
 
+@Test func aStartPutsTheRuntimeInTheBottleWhateverTheTitle() async throws {
+    let paths = temporaryRoot()
+    defer { remove(paths) }
+    try makeEngineAndBottle(paths)
+    let runtime = GDKRuntime(paths: paths)
+    try FileManager.default.createDirectory(at: paths.gdkRuntime, withIntermediateDirectories: true)
+    try Data("MZ \(GDKRuntime.marker)".utf8).write(to: runtime.dll)
+    let bottle = Bottle(paths: paths)
+    try FileManager.default.createDirectory(at: bottle.system32, withIntermediateDirectories: true)
+
+    // Battle.net is no GDK title. Steam is not one either, and the game Steam installs after
+    // it has started finds the runtime only if it was there first.
+    let launcher = TitleLauncher(paths: paths, title: battleNet)
+    _ = await collect(launcher.launch())
+
+    let placed = bottle.system32.appending(path: GDKRuntime.dllName)
+    #expect(try Data(contentsOf: placed) == Data(contentsOf: runtime.dll))
+    let log = try String(contentsOf: launcher.logURL, encoding: .utf8)
+    #expect(log.contains("=== xgameruntime placed in system32"))
+}
+
 @Test func stoppingKillsWineserverAndThenLooksRatherThanClaims() async throws {
     let paths = temporaryRoot()
     defer { remove(paths) }

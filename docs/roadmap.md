@@ -236,12 +236,13 @@ and the order. The first piece is in: two WinHTTP stubs, without which the GDK's
 drops every request (2026-09-29, `runtime.md`). The second is the runtime itself, in
 `xgameruntime/`: built by hand and put in a bottle's `system32` the same day, it took
 Minecraft Dungeons II past its launcher's check and as far as its sign-in with no stand-in.
-The app neither builds nor places it yet. The third is the sign-in, in SakeKit: that night it
-signed a real account in to Xbox Live with the title's own app ID. On 2026-09-30 the runtime
-and the sign-in together took Minecraft Dungeons II to character select with no stand-in: the
-runtime hands the game its user and tokens and asks sake through the bottle at the game's
-first token request, and sake shows the code the first time and nothing after. The app does
-not yet build or place the runtime.
+The third is the sign-in, in SakeKit: that night it signed a real account in to Xbox Live with
+the title's own app ID. On 2026-09-30 the runtime and the sign-in together took Minecraft
+Dungeons II to character select with no stand-in: the runtime hands the game its user and
+tokens and asks sake through the bottle at the game's first token request, and sake shows the
+code the first time and nothing after. The fourth came the same day: setup builds the runtime
+in a step of its own, and sake puts it in every bottle before it starts anything there, which
+took the game to character select with nothing done by hand.
 
 ## The Swift/subprocess boundary
 

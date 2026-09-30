@@ -84,6 +84,9 @@ public struct InstallerRunner: Sendable {
                     let log = try LogFile(at: logURL)
                     defer { log.close() }
 
+                    // Steam's installer can start Steam as it finishes, and a game installed in
+                    // that Steam never passes through sake's Play.
+                    GDKRuntime(paths: paths).place(in: bottle, loggingTo: log)
                     let command = self.command()
                     log.write("=== install \(command.arguments.joined(separator: " "))\n")
                     continuation.yield(.started(installer))

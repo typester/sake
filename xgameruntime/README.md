@@ -61,9 +61,19 @@ contains it, so its `LICENSE.md` goes wherever the DLL goes. No code or text her
 the community stand-in, whose repository has no licence; what it was seen to do is a fact
 the runtime follows (above).
 
+## How sake builds and places it
+
+Setup's GDK Runtime step builds it from the copy of this directory inside Sake.app, running
+this Makefile with a `CXX`, `LIBHTTPCLIENT` and `OUT` of its own, and keeps the DLL in the
+engine with libHttpClient's `LICENSE.md`. Before sake starts anything in a bottle it puts both
+in that bottle's `system32`, and it replaces a copy there only when the copy carries the string
+in `main.cpp`, which is why that string can never change. SakeKit's tests run this Makefile
+with a stand-in compiler, so a change to those three variables fails there. `docs/gdk.md` has
+the rest.
+
 ## Building it by hand
 
-Until SakeKit builds it:
+For working on it:
 
 ```sh
 curl -L -o target/libHttpClient-7ead73f6.tar.gz \
@@ -75,9 +85,10 @@ PATH=~/Library/Caches/Sake/toolchain/llvm-mingw-20260908-ucrt-macos-universal/bi
 ```
 
 The tarball hashed `dda556ee4c7f5f925779fec25a8dfa3d7b236513638b0e516ed456817c8aac94`
-on 2026-09-29, twice, an hour apart. GitHub generates these archives and does not promise
-to reproduce them byte for byte. The DLL lands in `target/xgameruntime/`: about 900 KB,
-importing the UCRT, KERNEL32 and ole32 and nothing else.
+on 2026-09-29, twice, an hour apart, and again on 2026-09-30. GitHub promises the files inside
+an archive of a commit and not its bytes, which is why SakeKit checks what it unpacks to
+instead. The DLL lands in `target/xgameruntime/`: about 900 KB, importing the UCRT, KERNEL32
+and ole32 and nothing else.
 
 ## The log
 

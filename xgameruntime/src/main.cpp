@@ -123,6 +123,10 @@ void Initialized(const char* how, uint64_t gdkVersion, uint64_t gsVersion, uint6
 
 using namespace sake;
 
+// SakeKit replaces a copy in a bottle only when it finds this, so a change to it leaves every
+// copy already placed where it is for good.
+extern "C" __attribute__((used)) const char kSakeRuntime[] = "sake's own xgameruntime.dll";
+
 extern "C" BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, void*) noexcept
 {
     if (reason == DLL_PROCESS_ATTACH) {

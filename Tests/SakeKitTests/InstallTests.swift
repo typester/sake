@@ -83,6 +83,26 @@ private func collect(_ stream: AsyncStream<InstallEvent>) async -> [InstallEvent
     #expect(recorded("wine.wineprefix", in: paths) == [Bottle(paths: paths).url.path])
 }
 
+@Test func anInstallerFindsTheRuntimeAlreadyInTheBottle() async throws {
+    let paths = temporaryRoot()
+    defer { remove(paths) }
+    try makeEngineAndBottle(paths)
+    let runtime = GDKRuntime(paths: paths)
+    try FileManager.default.createDirectory(at: paths.gdkRuntime, withIntermediateDirectories: true)
+    try Data("MZ \(GDKRuntime.marker)".utf8).write(to: runtime.dll)
+    let bottle = Bottle(paths: paths)
+    try FileManager.default.createDirectory(at: bottle.system32, withIntermediateDirectories: true)
+    let installer = try makeInstaller(paths, named: "SteamSetup.exe")
+
+    let runner = InstallerRunner(paths: paths, installer: installer)
+    _ = await collect(runner.run())
+
+    let placed = bottle.system32.appending(path: GDKRuntime.dllName)
+    #expect(try Data(contentsOf: placed) == Data(contentsOf: runtime.dll))
+    #expect(try String(contentsOf: runner.logURL, encoding: .utf8)
+        .contains("=== xgameruntime placed in system32"))
+}
+
 @Test func anMsiIsHandedToMsiexecRatherThanRunDirectly() throws {
     let paths = temporaryRoot()
     defer { remove(paths) }

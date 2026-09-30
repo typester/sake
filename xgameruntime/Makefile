@@ -11,7 +11,10 @@ OUT ?= ../target/xgameruntime
 TASK = AsyncLib TaskQueue ThreadPool_win32 WaitTimer_win32
 OWN = log main threading system networking user signin session
 
-CXXFLAGS = -std=c++20 -O2 -DNDEBUG -Isrc -I$(LIBHTTPCLIENT)/Include -I$(LIBHTTPCLIENT)/Source/Task
+# libHttpClient is compiled by absolute path, and its __FILE__ would put that path, with the
+# person's home in it, into the copy in every bottle.
+CXXFLAGS = -std=c++20 -O2 -DNDEBUG -Isrc -I$(LIBHTTPCLIENT)/Include -I$(LIBHTTPCLIENT)/Source/Task \
+           -ffile-prefix-map=$(LIBHTTPCLIENT)=libHttpClient
 OBJS = $(TASK:%=$(OUT)/obj/libHttpClient/%.o) $(OWN:%=$(OUT)/obj/%.o)
 
 $(OUT)/xgameruntime.dll: $(OBJS) xgameruntime.def

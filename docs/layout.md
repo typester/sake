@@ -12,10 +12,17 @@ those were measured in sake.
 /Applications/Sake.app                       the app, and nothing else
 ~/Library/Sake/
     engine/                                  Wine, its libraries and D3DMetal, 1.1 GB
+    engine/lib/xgameruntime/                 sake's GDK runtime, the licence of the
+                                             libHttpClient in it, and a hash of what it was
+                                             built from — see gdk.md
     bottles/<name>/                          one prefix each, and the games in them; empty
                                              is 1 GB, and a cloned game adds nothing
     bottles/<name>/sake-titles.json          what was added to the library by hand, if
                                              anything — see below
+    bottles/<name>/drive_c/windows/system32/xgameruntime.dll
+                                             a copy of the runtime, with the licence beside
+                                             it, put there before anything starts in the
+                                             bottle — see gdk.md
     bottles/<name>/drive_c/users/crossover/AppData/Local/Sake/<title ID>/
                                              where a GDK title's runtime asks sake for its
                                              user, and the session sake answers with —

@@ -115,7 +115,12 @@ stand-in's log and README record of its behaviour, and what its DLL does when a 
 it from outside, is used as a record and nothing more. Its task queue
 and `XAsync` are libHttpClient's, which is Microsoft's and MIT-licensed: fetched at a pinned
 commit rather than kept in this repository, and contained in any DLL built from it, so
-libHttpClient's licence goes wherever that DLL goes. From WineGDK it takes facts and no text:
+libHttpClient's licence goes wherever that DLL goes. Setup builds the DLL on the person's own
+Mac and keeps libHttpClient's `LICENSE.md` beside it in the engine, and every copy sake puts in
+a bottle's `system32` has that licence put beside it. The one file is enough: of what sake
+compiles out of `Source/Task` and `Include`, every file that names a copyright holder names
+Microsoft, and `NOTICE.txt` and `ThirdPartyNotices.txt` are about code sake does not compile
+(read 2026-09-30). From WineGDK it takes facts and no text:
 which IDs the interfaces have and the order of their slots. This section used to say code
 would start from the part of WineGDK its author declared CC0; the part worth taking turned out
 to be libHttpClient's, under an LGPL header there (`gdk.md`). Signing in uses the title's own

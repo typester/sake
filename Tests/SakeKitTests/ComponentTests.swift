@@ -24,6 +24,18 @@ import Testing
     }
 }
 
+@Test func libHttpClientIsFetchedByCommitAndNoPartOfTheSourcesStep() {
+    let commit = "7ead73f6389271c2dc2cb10cdafcc587b899bd8a"
+    let libHttpClient = Component.libHttpClient
+
+    #expect(libHttpClient.url.path.contains(commit))
+    #expect(libHttpClient.unpacked == "libHttpClient-\(commit)")
+    // GitHub promises the files inside an archive of a commit and not its bytes, so it is
+    // the files that are checked, and a hash of the archive would only be a way to fail.
+    #expect(libHttpClient.sha256 == nil)
+    #expect(!Component.all.contains(libHttpClient))
+}
+
 @Test func theFileNameCarriesTheVersionSoARaiseCannotHitAStaleDownload() {
     let bison = Component.all.first { $0.id == "bison" }
 

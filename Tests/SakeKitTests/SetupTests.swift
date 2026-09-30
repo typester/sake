@@ -44,6 +44,8 @@ private func finish(_ step: SetupStep, in paths: Paths) throws {
             try touch(dll)
             try Data(D3DMetalInstaller.appleMarker.utf8).write(to: dll)
         }
+    case .gdkRuntime:
+        try touch(GDKRuntime(paths: paths).dll)
     case .bottle:
         try touch(Bottle(paths: paths).systemRegistry)
     }
@@ -52,7 +54,7 @@ private func finish(_ step: SetupStep, in paths: Paths) throws {
 @Test func setupOpensOnTheFirstThingThatIsNotDone() throws {
     let paths = temporaryRoot()
     defer { remove(paths) }
-    let setup = Setup(paths: paths)
+    let setup = Setup(paths: paths, runtimeSources: nil)
 
     // Nothing on disk and a Mac that cannot do it: there is only one place to start.
     #expect(setup.current(machineIsReady: false) == .machine)
@@ -63,10 +65,10 @@ private func finish(_ step: SetupStep, in paths: Paths) throws {
 @Test func eachStepFinishedMovesTheWizardToTheNextOne() throws {
     let paths = temporaryRoot()
     defer { remove(paths) }
-    let setup = Setup(paths: paths)
+    let setup = Setup(paths: paths, runtimeSources: nil)
 
     // The order is the dependency order, so this also fails if the cases are reordered.
-    let expected: [SetupStep] = [.sources, .prefix, .wine, .d3dMetal, .bottle]
+    let expected: [SetupStep] = [.sources, .prefix, .wine, .d3dMetal, .gdkRuntime, .bottle]
     for (index, step) in expected.enumerated() {
         #expect(setup.current(machineIsReady: true) == step)
         try finish(step, in: paths)
@@ -79,7 +81,7 @@ private func finish(_ step: SetupStep, in paths: Paths) throws {
 @Test func aStepWhosePrerequisiteIsMissingSaysWhichOne() throws {
     let paths = temporaryRoot()
     defer { remove(paths) }
-    let setup = Setup(paths: paths)
+    let setup = Setup(paths: paths, runtimeSources: nil)
 
     func reason(_ step: SetupStep) -> String? {
         if case .blocked(let why) = setup.state(of: step, machineIsReady: true) { why } else { nil }
@@ -88,6 +90,7 @@ private func finish(_ step: SetupStep, in paths: Paths) throws {
     #expect(reason(.prefix)?.contains("sources") == true)
     #expect(reason(.wine)?.contains("bison") == true)
     #expect(reason(.d3dMetal)?.contains("Build Wine first") == true)
+    #expect(reason(.gdkRuntime)?.contains("carries no source") == true)
     #expect(reason(.bottle)?.contains("Build Wine first") == true)
 
     // Wine's own prerequisite names the first library it cannot find, which is how the
@@ -95,13 +98,19 @@ private func finish(_ step: SetupStep, in paths: Paths) throws {
     try finish(.sources, in: paths)
     try finish(.prefix, in: paths)
     #expect(setup.state(of: .wine, machineIsReady: true) == .ready)
+
+    // The runtime needs the compiler the sources brought, and nothing Wine does.
+    let runtimeSources = paths.root.deletingLastPathComponent().appending(path: "xgameruntime")
+    try FileManager.default.createDirectory(at: runtimeSources, withIntermediateDirectories: true)
+    #expect(Setup(paths: paths, runtimeSources: runtimeSources)
+        .state(of: .gdkRuntime, machineIsReady: true) == .ready)
 }
 
 @Test func aMacThatIsNotReadyBlocksEverythingBelowTheFirstStep() throws {
     let paths = temporaryRoot()
     defer { remove(paths) }
     for step in SetupStep.allCases { try finish(step, in: paths) }
-    let setup = Setup(paths: paths)
+    let setup = Setup(paths: paths, runtimeSources: nil)
 
     #expect(setup.isComplete(machineIsReady: true))
     // A finished tree on a Mac that fails preflight is not finished: the check is the

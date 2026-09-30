@@ -41,6 +41,12 @@ public struct Paths: Sendable, Equatable {
     /// tarball -- the only copy sake has of it.
     public var wineBuild: URL { build.appending(path: "wine") }
 
+    /// sake's own `xgameruntime.dll`, with libHttpClient's licence beside it: the copy every
+    /// bottle's `system32` is given one of. See docs/gdk.md.
+    public var gdkRuntime: URL { engine.appending(path: "lib/xgameruntime") }
+
+    public var gdkRuntimeBuild: URL { build.appending(path: "xgameruntime") }
+
     /// Wine's unix-side libraries, and the only place anything `dlopen`s the engine's dylibs
     /// from, so this is the directory a `@loader_path` soname resolves against. Nothing sits
     /// beside it for i386: under WoW64 the unix side is x86_64 only.

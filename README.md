@@ -19,15 +19,16 @@ cannot, that is worth hearing too.
 ## What it does
 
 The app answers whether this Mac can do the rest — Apple silicon, Rosetta 2, the Command
-Line Tools, Apple's Game Porting Toolkit, room on disk — then walks six steps, one screen
+Line Tools, Apple's Game Porting Toolkit, room on disk — then walks seven steps, one screen
 at a time:
 
 1. download the sources and check them against known hashes
 2. unpack them and build the tools and libraries Wine is configured against
 3. build CrossOver's Wine itself, with the patches in `patches/`
 4. guide Apple's D3DMetal in from an image you mounted, and unmount it again
-5. make a bottle — one Wine prefix, which is where a game lives
-6. put a game in it — its own installer, the one you downloaded, runs inside the bottle
+5. build what games made with Microsoft's GDK load in place of Xbox Gaming Services
+6. make a bottle — one Wine prefix, which is where a game lives
+7. put a game in it — its own installer, the one you downloaded, runs inside the bottle
 
 After that the library is where you live. A bottle holds titles you added; a title is a
 program in that bottle, its name, the arguments it starts with and any environment of its
@@ -74,7 +75,7 @@ repository has actually taken.
 
 ## Using it
 
-Open the app. The setup wizard comes up when the six steps are not finished and stays out of
+Open the app. The setup wizard comes up when the seven steps are not finished and stays out of
 the way when they are. It runs for tens of minutes, mostly compiling, and sends you to
 Apple's download page once, for the toolkit.
 
@@ -108,9 +109,10 @@ unmounts it again. See `docs/licensing.md`.
 
 | | |
 |---|---|
-| `Sources/SakeKit/` | the layout, a subprocess runner, the preflight checks, the source fetcher, the prefix build, the Wine build, the patch step, the D3DMetal step, the bottle, the import, the installer, the titles, starting one, how big a tree is, and the uninstall |
+| `Sources/SakeKit/` | the layout, a subprocess runner, the preflight checks, the source fetcher, the prefix build, the Wine build, the patch step, the D3DMetal step, the GDK runtime's build and placing it, the bottle, the import, the installer, the titles, starting one, the Xbox sign-in for GDK titles, how big a tree is, and the uninstall |
 | `Sources/sake/` | the SwiftUI app — two windows, kept thin |
 | `patches/` | the changes sake makes to Wine's own code — LGPL-2.1-or-later, not MIT; `patches/README.md` says where each came from |
+| `xgameruntime/` | the DLL games built on Microsoft's GDK load in place of Xbox Gaming Services — C++, which setup compiles; its `README.md` says what it answers |
 | `docs/` | how the thing actually has to work, what breaks when it doesn't, and how to play one game |
 | `assets/` | the app icon, the code that draws it, the screenshot above, and the guide's under `getting-started/` |
 | `scripts/build-app.sh` | builds `target/Sake.app` |
