@@ -34,7 +34,7 @@ HRESULT QueryPreferredLocalUdpMultiplayerPortAsyncResult(void*, XAsyncBlock* asy
                              sizeof(*port), port, nullptr);
 }
 
-// Nothing here ever changes, so a registration is a token and nothing else.
+// The preferred UDP port never changes, so a registration for it is a token and nothing else.
 HRESULT RegisterChange(void*, XTaskQueueHandle queue, void*, void*, XTaskQueueRegistrationToken* token) noexcept
 {
     SAKE_TRACE("%p", queue);
@@ -108,13 +108,86 @@ HRESULT VerifyServerCertificate(void*, void* request, const XNetworkingSecurityI
 
 // Nothing here ever sends a change event, so the first answer is the only one a title
 // gets: it has to say the network is up.
+constexpr XNetworkingConnectivityHint kOnline = {kInternetAccess, kUnrestricted, kEthernet, true, false, false, false};
+
 HRESULT GetConnectivityHint(void*, XNetworkingConnectivityHint* hint) noexcept
 {
     SAKE_TRACE("");
     if (hint == nullptr)
         return E_POINTER;
-    *hint = {kInternetAccess, kUnrestricted, kEthernet, true, false, false, false};
+    *hint = kOnline;
     return S_OK;
+}
+
+typedef void(CALLBACK* HintCallback)(void* context, const XNetworkingConnectivityHint* hint);
+
+struct HintRegistration {
+    XTaskQueueHandle queue;
+    uint64_t token;
+};
+
+SRWLOCK g_hintLock = SRWLOCK_INIT;
+std::vector<HintRegistration> g_hints;
+
+struct HintDelivery {
+    HintCallback callback;
+    void* context;
+    XNetworkingConnectivityHint hint;
+};
+
+void CALLBACK DeliverHint(void* context, bool canceled) noexcept
+{
+    HintDelivery* delivery = static_cast<HintDelivery*>(context);
+    if (!canceled)
+        delivery->callback(delivery->context, &delivery->hint);
+    delete delivery;
+}
+
+// Registering sends an initial notification, Microsoft's reference says, and Minecraft
+// Dungeons II sent no request until it had one (docs/gdk.md). The community stand-in sends it
+// once, on the completion port of the queue the title registered, and so does this.
+HRESULT RegisterConnectivityHintChanged(void*, XTaskQueueHandle queue, void* context, void* callback,
+                                        XTaskQueueRegistrationToken* token) noexcept
+{
+    if (token == nullptr || callback == nullptr)
+        return E_POINTER;
+    XTaskQueueHandle kept = nullptr;
+    if (queue != nullptr ? FAILED(::XTaskQueueDuplicateHandle(queue, &kept))
+                         : !::XTaskQueueGetCurrentProcessTaskQueue(&kept))
+        return E_INVALIDARG;
+    *token = NextToken();
+    AcquireSRWLockExclusive(&g_hintLock);
+    g_hints.push_back({kept, token->token});
+    ReleaseSRWLockExclusive(&g_hintLock);
+
+    HRESULT hr = E_OUTOFMEMORY;
+    auto* delivery = new (std::nothrow) HintDelivery{reinterpret_cast<HintCallback>(callback), context, kOnline};
+    if (delivery != nullptr) {
+        hr = ::XTaskQueueSubmitCallback(kept, XTaskQueuePort::Completion, delivery, DeliverHint);
+        if (FAILED(hr))
+            delete delivery;
+    }
+    SAKE_TRACE("%p token %llu, initial notification %#lx", queue, static_cast<unsigned long long>(token->token),
+               static_cast<unsigned long>(hr));
+    return S_OK;
+}
+
+bool UnregisterConnectivityHintChanged(void*, XTaskQueueRegistrationToken token, bool) noexcept
+{
+    SAKE_TRACE("%llu", static_cast<unsigned long long>(token.token));
+    XTaskQueueHandle queue = nullptr;
+    AcquireSRWLockExclusive(&g_hintLock);
+    for (auto registration = g_hints.begin(); registration != g_hints.end(); ++registration) {
+        if (registration->token == token.token) {
+            queue = registration->queue;
+            g_hints.erase(registration);
+            break;
+        }
+    }
+    ReleaseSRWLockExclusive(&g_hintLock);
+    if (queue != nullptr)
+        ::XTaskQueueCloseHandle(queue);
+    return true;
 }
 
 HRESULT QueryConfigurationSetting(void*, uint32_t setting, uint64_t*) noexcept
@@ -150,8 +223,8 @@ constexpr XNetworkingVtbl kVtbl = {
     .XNetworkingQuerySecurityInformationForUrlUtf16AsyncResult = QuerySecurityInformationResult,
     .XNetworkingVerifyServerCertificate = VerifyServerCertificate,
     .XNetworkingGetConnectivityHint = GetConnectivityHint,
-    .XNetworkingRegisterConnectivityHintChanged = RegisterChange,
-    .XNetworkingUnregisterConnectivityHintChanged = UnregisterChange,
+    .XNetworkingRegisterConnectivityHintChanged = RegisterConnectivityHintChanged,
+    .XNetworkingUnregisterConnectivityHintChanged = UnregisterConnectivityHintChanged,
     .XNetworkingQueryConfigurationSetting = QueryConfigurationSetting,
     .XNetworkingSetConfigurationSetting = SetConfigurationSetting,
     .XNetworkingQueryStatistics = QueryStatistics,

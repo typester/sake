@@ -237,10 +237,11 @@ drops every request (2026-09-29, `runtime.md`). The second is the runtime itself
 `xgameruntime/`: built by hand and put in a bottle's `system32` the same day, it took
 Minecraft Dungeons II past its launcher's check and as far as its sign-in with no stand-in.
 The app neither builds nor places it yet. The third is the sign-in, in SakeKit: that night it
-signed a real account in to Xbox Live with the title's own app ID, and on 2026-09-30 the
-runtime asked for it through the bottle and sake answered, showing the code the first time
-and nothing the second. The runtime does not hand the user to the game yet, and it asked too
-early, before the game's window was up; `gdk.md` has where the sign-in moves.
+signed a real account in to Xbox Live with the title's own app ID. On 2026-09-30 the runtime
+and the sign-in together took Minecraft Dungeons II to character select with no stand-in: the
+runtime hands the game its user and tokens and asks sake through the bottle at the game's
+first token request, and sake shows the code the first time and nothing after. The app does
+not yet build or place the runtime.
 
 ## The Swift/subprocess boundary
 

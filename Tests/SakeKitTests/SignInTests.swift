@@ -403,7 +403,7 @@ private func events(_ stream: AsyncStream<SignInEvent>) async -> [SignInEvent] {
 
 private func xboxSignIn(
     _ server: FakeServer,
-    relyingParties: [RelyingParty] = [RelyingParty("http://playfab.xboxlive.com/")],
+    relyingParties: [RelyingParty] = [RelyingParty("http://playfab.xboxlive.com/", hosts: ["playfabapi.com"])],
     device: XboxDevice? = nil
 ) -> XboxSignIn {
     XboxSignIn(
@@ -574,6 +574,8 @@ private func permissions(of url: URL) throws -> Int? {
     let session = mailboxFile("session", request, in: paths)
     let lines = try String(contentsOf: session, encoding: .utf8).split(separator: "\n").map(String.init)
     #expect(lines.contains("xuid 2814630418365389"))
+    #expect(lines.contains("endpoint playfabapi.com http://playfab.xboxlive.com/"))
+    #expect(lines.contains("endpoint xboxlive.com http://xboxlive.com"))
     #expect(lines.contains { $0.hasPrefix("token http://playfab.xboxlive.com/ ") && $0.hasSuffix(" the-playfab-token") })
     #expect(try permissions(of: session) == 0o600)
 

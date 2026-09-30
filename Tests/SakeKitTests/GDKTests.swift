@@ -103,7 +103,9 @@ private func write(_ text: String, to directory: URL) throws -> URL {
     let dungeons = try GDKTitle(config: write(config(titleID: "6B9DE498"), to: paths.root.appending(path: "a")))
     let other = try GDKTitle(config: write(config(), to: paths.root.appending(path: "b")))
 
-    #expect(dungeons.relyingParties == [.playFab, RelyingParty("rp://api.minecraftservices.com/")])
+    #expect(dungeons.relyingParties == [
+        .playFab, RelyingParty("rp://api.minecraftservices.com/", hosts: ["api.minecraftservices.com"]),
+    ])
     #expect(other.relyingParties == [.playFab])
     #expect(RelyingParty.playFab.boundToDevice)
     #expect(!RelyingParty.identity.boundToDevice)
@@ -194,7 +196,8 @@ private func ask(_ mailbox: GDKMailbox, titleID: String = "12AB34CD", id: String
         user: try #require(token.user),
         tokens: ["http://xboxlive.com": token, "http://playfab.xboxlive.com/": token]
     )
-    try box.write(session, for: request)
+    let unused = RelyingParty("rp://unused.example/", hosts: ["unused.example"])
+    try box.write(session, for: request, relyingParties: [.identity, .playFab, unused])
     let expiry = Int(token.notAfter.timeIntervalSince1970)
     let written = folder.appending(path: "session")
     #expect(try String(contentsOf: written, encoding: .utf8) == """
@@ -206,6 +209,8 @@ private func ask(_ mailbox: GDKMailbox, titleID: String = "12AB34CD", id: String
         privileges 190 191
         token http://playfab.xboxlive.com/ \(expiry) the-token
         token http://xboxlive.com \(expiry) the-token
+        endpoint playfabapi.com http://playfab.xboxlive.com/
+        endpoint xboxlive.com http://xboxlive.com
 
         """)
     #expect(try FileManager.default.attributesOfItem(atPath: written.path)[.posixPermissions] as? Int == 0o600)

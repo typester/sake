@@ -4,10 +4,10 @@ sake's own `xgameruntime.dll`: the Gaming Runtime that a title built on Microsof
 loads. On Windows, Xbox Gaming Services installs that DLL; Wine has none, and this is what
 sake puts in its place. `docs/gdk.md` has the design and what has been measured with it.
 
-The silent `XUserAddAsync` asks sake to sign the person in, through files in the bottle that
-`docs/gdk.md` describes, and fails once sake has answered: the user is not handed to the
-title yet. It is also the wrong place to ask, since it holds the title's start until the
-sign-in is done; `docs/gdk.md` has where the sign-in moves.
+It hands a title its user and tokens: the person sake signed in, from a session sake writes
+into the bottle, and a placeholder until there is one. The first token request with no good
+session asks sake to sign the person in, through files `docs/gdk.md` describes, and completes
+once sake has.
 
 ## How a title reaches it
 
@@ -26,10 +26,10 @@ vtable, and releases it.
 | XGameRuntimeFeature | true for the features below, false for the rest |
 | XError | options and callback accepted, reports logged |
 | XSystem, XSystemAnalytics | sandbox `RETAIL`; the rest minimal |
-| XNetworking | online, unmetered; TLS 1.2 and no pinned certificates for every URL |
+| XNetworking | online, unmetered, with the initial notification to each registration for changes; TLS 1.2 and no pinned certificates for every URL |
 | XGame | the title ID from the title's `MicrosoftGame.config` |
 | XGameProtocol, XGameInvite | registrations accepted, never fired |
-| XUser, XUserGamertag, XUserDevice | no user yet: the silent add asks sake to sign in and then fails; any other add fails as a closed sign-in window |
+| XUser, XUserGamertag, XUserDevice | one user: the session's person, or a placeholder until the first token request asks sake; one `SignedInAgain` after the silent add; tokens by host from the session, unsigned; no gamer picture and no devices |
 
 A class answers every interface version it is known by from one table that carries all of
 their slots. Anything else is refused and logged.
@@ -41,8 +41,15 @@ their slots. Anything else is refused and logged.
   the argument shape of each slot they call. Minecraft Dungeons II's executable is
   encrypted on disk, but its IDs are in its `.rdata`, and the thunks in its DLLs can be read.
 - **WineGDK** (`Weather-OS/WineGDK` at `b03ba49`): the slot order of the interfaces it
-  describes. Only those facts are used, not its text, and every slot Minecraft Dungeons II
-  calls before signing in was checked against the thunks.
+  describes. Only those facts are used, not its text. Every `XUser` slot was checked against
+  the thunks on 2026-09-30, and every slot Minecraft Dungeons II calls before signing in
+  before that.
+- **Microsoft's GDK reference** (learn.microsoft.com, read 2026-09-30): the shapes of what
+  `XUser` hands back, its enumerations and error codes, and the initial notification a
+  registration for connectivity changes gets.
+- **The community stand-in, run from outside**: which change event it delivers after the
+  silent add, and where the notifications arrive. Its DLL was called from a probe and its
+  code was not read.
 - **libHttpClient** (`microsoft/libHttpClient`): XAsync and XTaskQueue, compiled unmodified
   from `Source/Task`. `src/pch.h` stands in for the header its own build provides.
 
@@ -50,8 +57,9 @@ their slots. Anything else is refused and logged.
 
 The code in this directory is MIT, like the rest of sake. libHttpClient is MIT too,
 Copyright (c) Microsoft Corporation. It is fetched rather than kept here, and a built DLL
-contains it, so its `LICENSE.md` goes wherever the DLL goes. Nothing here comes from the
-community stand-in, whose repository has no licence.
+contains it, so its `LICENSE.md` goes wherever the DLL goes. No code or text here comes from
+the community stand-in, whose repository has no licence; what it was seen to do is a fact
+the runtime follows (above).
 
 ## Building it by hand
 

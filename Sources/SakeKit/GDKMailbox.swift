@@ -75,7 +75,9 @@ public struct GDKMailbox: Sendable {
     }
 
     /// Before the answer that says `signed-in`, since the runtime reads it on seeing that.
-    public func write(_ session: XboxSession, for request: Request) throws {
+    /// Which token a URL takes is written here, by host, so that the runtime knows no table
+    /// of its own.
+    public func write(_ session: XboxSession, for request: Request, relyingParties: [RelyingParty]) throws {
         let user = session.user
         var lines: [String] = []
         for (key, value) in [
@@ -86,6 +88,11 @@ public struct GDKMailbox: Sendable {
         }
         for (relyingParty, token) in session.tokens.sorted(by: { $0.key < $1.key }) {
             lines.append("token \(relyingParty) \(Int(token.notAfter.timeIntervalSince1970)) \(token.token)")
+        }
+        let endpoints = relyingParties.filter { session.tokens[$0.name] != nil }
+            .flatMap { relyingParty in relyingParty.hosts.map { ($0, relyingParty.name) } }
+        for (host, relyingParty) in endpoints.sorted(by: { $0.0 < $1.0 }) {
+            lines.append("endpoint \(host) \(relyingParty)")
         }
         try Self.write(lines, to: folder(for: request).appending(path: "session"), ownerOnly: true)
     }

@@ -2,6 +2,8 @@
 
 #include "pch.h"
 
+#include <string>
+
 namespace sake {
 
 void Log(const char* format, ...) noexcept __attribute__((format(printf, 1, 2)));
@@ -17,7 +19,9 @@ void FormatGuid(const GUID& guid, char (&out)[40]) noexcept;
             ::sake::Log("%s #%u " format, __func__, sake_n_ __VA_OPT__(,) __VA_ARGS__); \
     } while (0)
 
+constexpr HRESULT E_GAMEUSER_RESOLVE_USER_ISSUE_REQUIRED = static_cast<HRESULT>(0x89245102);
 constexpr HRESULT E_GAMEUSER_USER_NOT_FOUND = static_cast<HRESULT>(0x89245104);
+constexpr HRESULT E_GAMEUSER_NO_TOKEN_REQUIRED = static_cast<HRESULT>(0x89245105);
 constexpr HRESULT E_GAMEUSER_DEFERRAL_NOT_AVAILABLE = static_cast<HRESULT>(0x89245103);
 constexpr HRESULT E_GAMEUSER_NO_DEFAULT_USER = static_cast<HRESULT>(0x89245106);
 constexpr HRESULT E_GAMEUSER_NO_TITLE_ID = static_cast<HRESULT>(0x89245108);
@@ -31,9 +35,6 @@ XTaskQueueRegistrationToken NextToken() noexcept;
 // From the title's MicrosoftGame.config, or 0 when there is none.
 uint32_t TitleId() noexcept;
 
-// Begins `async` as a call that asks sake to sign the person in and completes when sake
-// answers, through the files docs/gdk.md describes.
-HRESULT AskSakeToSignIn(XAsyncBlock* async, const void* identity, const char* identityName) noexcept;
 
 // Every object is a static singleton whose first member is its vtable, which is the whole
 // of COM's layout. The vtables are structs of function pointers rather than C++ virtual
@@ -83,6 +84,59 @@ typedef struct XUser* XUserHandle;
 struct XUserLocalId {
     uint64_t value;
 };
+
+// What an XUser call hands back once it completes: nothing, the user's handle, or a token
+// laid out the way XUserGetTokenAndSignatureData, or its UTF-16 twin, lays one out.
+struct Payload {
+    enum class Kind { None, User, Token, TokenUtf16 };
+    Kind kind = Kind::None;
+    XUserHandle user = nullptr;
+    std::string token;
+
+    size_t Size() const noexcept;
+    void Write(void* buffer) const noexcept;
+};
+
+// Completes `async` inside Begin, so that nothing of it is ever queued on the caller's queue.
+HRESULT CompleteNow(XAsyncBlock* async, const void* identity, const char* identityName, HRESULT result,
+                    Payload payload) noexcept;
+
+// Asks sake to sign the person in, through the files docs/gdk.md describes, and completes
+// `async` with what `finish` makes of the answer's state: signed-in, failed, cancelled,
+// unanswered or timed out.
+using Finish = std::function<HRESULT(const char* state, Payload& payload)>;
+HRESULT AskSake(XAsyncBlock* async, const void* identity, const char* identityName, Finish finish) noexcept;
+
+// This title's session, as sake last wrote it.
+struct Session {
+    struct Token {
+        std::string relyingParty;
+        uint64_t notAfter = 0;
+        std::string value;
+    };
+    struct Endpoint {
+        std::string host;
+        std::string relyingParty;
+    };
+    uint64_t xuid = 0;
+    std::string gamertag;
+    std::string userHash;
+    std::string ageGroup;
+    std::string privileges;
+    std::vector<Token> tokens;
+    std::vector<Endpoint> endpoints;
+
+    // The token for `url`, or nullptr; `covered` says whether any relying party covers the
+    // URL's host at all.
+    const Token* TokenFor(const char* url, bool* covered) const noexcept;
+    const Token* Named(const char* relyingParty) const noexcept;
+};
+
+// False when there is no session, or none this runtime can use.
+bool ReadSession(Session& session) noexcept;
+
+// Seconds since 1970, which is how sake writes a token's expiry.
+uint64_t Now() noexcept;
 
 struct XVersion {
     uint16_t major;

@@ -12,16 +12,15 @@ public enum GDKSignInEvent: Sendable, Equatable {
 extension GDKTitle {
     /// What the default endpoint table does not cover, by title ID. sake cannot read a
     /// title's own table without a title token. See docs/gdk.md.
-    static let ownRelyingParties: [UInt32: [String]] = [
+    static let ownRelyingParties: [UInt32: [RelyingParty]] = [
         // Minecraft Dungeons II
-        0x6B9D_E498: ["rp://api.minecraftservices.com/"],
+        0x6B9D_E498: [RelyingParty("rp://api.minecraftservices.com/", hosts: ["api.minecraftservices.com"])],
     ]
 
     /// Every relying party a sign-in for this title asks for, besides the one that names
     /// the person.
     public var relyingParties: [RelyingParty] {
-        let own = UInt32(titleID, radix: 16).flatMap { Self.ownRelyingParties[$0] } ?? []
-        return [.playFab] + own.map { RelyingParty($0) }
+        [.playFab] + (UInt32(titleID, radix: 16).flatMap { Self.ownRelyingParties[$0] } ?? [])
     }
 }
 
@@ -105,7 +104,7 @@ public struct GDKSignIn: Sendable {
             case .signedIn(let result):
                 do {
                     try accounts.save(XboxAccount(refreshToken: result.refreshToken, device: device), for: clientID)
-                    try mailbox.write(result.session, for: request)
+                    try mailbox.write(result.session, for: request, relyingParties: [.identity] + title.relyingParties)
                 } catch {
                     return fail(error.localizedDescription, title.name)
                 }

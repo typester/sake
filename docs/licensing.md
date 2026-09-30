@@ -111,7 +111,8 @@ happy would hide the one thing about it that has to be visible.
 For titles built on Microsoft's GDK, sake provides its own stand-in for the Gaming Runtime
 (`gdk.md`). It never ships, downloads or copies Microsoft's GDK or Gaming Services, and it
 takes no code or text from the community stand-in, whose repository has no licence: what the
-stand-in's log and README record of its behaviour is used as a record and nothing more. Its task queue
+stand-in's log and README record of its behaviour, and what its DLL does when a probe calls
+it from outside, is used as a record and nothing more. Its task queue
 and `XAsync` are libHttpClient's, which is Microsoft's and MIT-licensed: fetched at a pinned
 commit rather than kept in this repository, and contained in any DLL built from it, so
 libHttpClient's licence goes wherever that DLL goes. From WineGDK it takes facts and no text:

@@ -1,4 +1,4 @@
-#include "runtime.h"
+#include "mailbox.h"
 
 namespace sake {
 namespace {
@@ -19,7 +19,24 @@ struct Wait {
     XAsyncBlock* async = nullptr;
     wchar_t folder[MAX_PATH] = {};
     char id[40] = {};
+    Finish finish;
+    Payload payload;
 };
+
+// There is one request file per title and a title asks for several tokens at once, so a call
+// that asks while a request is out joins it: replacing the file would leave the first call
+// waiting for an answer to a request sake never saw.
+SRWLOCK g_askLock = SRWLOCK_INIT;
+char g_askId[40];
+ULONGLONG g_askSince;
+
+void ForgetAsk(const char* id) noexcept
+{
+    AcquireSRWLockExclusive(&g_askLock);
+    if (strcmp(g_askId, id) == 0)
+        g_askId[0] = '\0';
+    ReleaseSRWLockExclusive(&g_askLock);
+}
 
 void Release(Wait* wait) noexcept
 {
@@ -42,64 +59,6 @@ bool Claimed(Wait* wait) noexcept
     bool claimed = wait->claimed;
     ReleaseSRWLockShared(&wait->lock);
     return claimed;
-}
-
-bool PathIn(const wchar_t* folder, const wchar_t* name, wchar_t (&path)[MAX_PATH]) noexcept
-{
-    return swprintf(path, MAX_PATH, L"%ls\\%ls", folder, name) >= 0;
-}
-
-// %LOCALAPPDATA%\Sake\<title ID>, made if it is not there.
-bool MakeFolder(uint32_t titleId, wchar_t (&folder)[MAX_PATH]) noexcept
-{
-    wchar_t base[MAX_PATH];
-    DWORD length = GetEnvironmentVariableW(L"LOCALAPPDATA", base, MAX_PATH);
-    if (length == 0 || length >= MAX_PATH || swprintf(folder, MAX_PATH, L"%ls\\Sake", base) < 0)
-        return false;
-    CreateDirectoryW(folder, nullptr);
-    if (swprintf(folder, MAX_PATH, L"%ls\\Sake\\%08X", base, titleId) < 0)
-        return false;
-    return CreateDirectoryW(folder, nullptr) || GetLastError() == ERROR_ALREADY_EXISTS;
-}
-
-// Calls `each(key, value)` for the lines of a file sake or this runtime wrote, once its
-// first line has named the format.
-template <typename Each>
-bool ReadFields(const wchar_t* folder, const wchar_t* name, char* text, size_t size, Each each) noexcept
-{
-    wchar_t path[MAX_PATH];
-    if (!PathIn(folder, name, path))
-        return false;
-    HANDLE file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                              nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (file == INVALID_HANDLE_VALUE)
-        return false;
-    DWORD read = 0;
-    BOOL ok = ReadFile(file, text, static_cast<DWORD>(size - 1), &read, nullptr);
-    ::CloseHandle(file);
-    if (!ok)
-        return false;
-    text[read] = '\0';
-
-    bool first = true;
-    for (char* line = text; line != nullptr && *line != '\0';) {
-        char* next = strchr(line, '\n');
-        if (next != nullptr)
-            *next++ = '\0';
-        size_t length = strlen(line);
-        if (length > 0 && line[length - 1] == '\r')
-            line[length - 1] = '\0';
-        if (first) {
-            if (strcmp(line, "sake 1") != 0)
-                return false;
-            first = false;
-        } else if (char* space = strchr(line, ' ')) {
-            *space = '\0';
-            each(line, space + 1);
-        }
-        line = next;
-    }
-    return !first;
 }
 
 bool WriteRequest(const Wait& wait) noexcept
@@ -131,19 +90,6 @@ void TakeRequestBack(const Wait& wait) noexcept
     wchar_t path[MAX_PATH];
     if (ours && PathIn(wait.folder, L"request", path))
         DeleteFileW(path);
-}
-
-void LogSession(const Wait& wait) noexcept
-{
-    char text[65536];
-    int tokens = 0;
-    bool person = false;
-    ReadFields(wait.folder, L"session", text, sizeof(text), [&](const char* key, const char*) {
-        tokens += strcmp(key, "token") == 0;
-        person = person || strcmp(key, "xuid") == 0;
-    });
-    Log("sign-in %s: sake signed %s in, %d tokens in the session; the user is not handed to the title yet",
-        wait.id, person ? "somebody" : "nobody it could name", tokens);
 }
 
 DWORD WINAPI WaitForSake(void* context) noexcept
@@ -189,15 +135,15 @@ DWORD WINAPI WaitForSake(void* context) noexcept
     }
 
     if (Claim(wait)) {
-        if (strcmp(state, "signed-in") == 0)
-            LogSession(*wait);
-        else if (strcmp(state, "unanswered") == 0)
+        if (strcmp(state, "unanswered") == 0)
             Log("sign-in %s: nothing picked it up in %llu s; sake has to be running to answer", wait->id,
                 kPickUpMs / 1000);
         else
-            Log("sign-in %s: %s %s", wait->id, state, reason);
+            Log("sign-in %s: %s after %llu ms %s", wait->id, state, GetTickCount64() - started, reason);
         TakeRequestBack(*wait);
-        ::XAsyncComplete(wait->async, E_GAMEUSER_NO_DEFAULT_USER, 0);
+        ForgetAsk(wait->id);
+        HRESULT hr = wait->finish(state, wait->payload);
+        ::XAsyncComplete(wait->async, hr, SUCCEEDED(hr) ? wait->payload.Size() : 0);
     }
     Release(wait);
     return 0;
@@ -209,18 +155,32 @@ HRESULT CALLBACK Provider(XAsyncOp op, const XAsyncProviderData* data) noexcept
     switch (op) {
     case XAsyncOp::Begin: {
         wait->async = data->async;
-        uint32_t titleId = TitleId();
-        GUID guid;
-        char text[40];
-        if (titleId == 0 || !MakeFolder(titleId, wait->folder) || FAILED(CoCreateGuid(&guid))) {
-            Log("sign-in: no folder to ask sake in (title ID %08X)", titleId);
-            return E_GAMEUSER_NO_DEFAULT_USER;
+        if (!MailboxFolder(wait->folder)) {
+            Log("sign-in: no folder to ask sake in (title ID %08X)", TitleId());
+            return E_GAMEUSER_RESOLVE_USER_ISSUE_REQUIRED;
         }
-        FormatGuid(guid, text);
-        snprintf(wait->id, sizeof(wait->id), "{%s}", text);
-        if (!WriteRequest(*wait)) {
-            Log("sign-in %s: the request could not be written to %ls", wait->id, wait->folder);
-            return E_GAMEUSER_NO_DEFAULT_USER;
+        AcquireSRWLockExclusive(&g_askLock);
+        bool joined = g_askId[0] != '\0' && GetTickCount64() - g_askSince < kGiveUpMs;
+        bool written = joined;
+        if (joined) {
+            strcpy_s(wait->id, g_askId);
+        } else {
+            GUID guid;
+            char text[40];
+            if (SUCCEEDED(CoCreateGuid(&guid))) {
+                FormatGuid(guid, text);
+                snprintf(wait->id, sizeof(wait->id), "{%s}", text);
+                written = WriteRequest(*wait);
+            }
+            if (written) {
+                strcpy_s(g_askId, wait->id);
+                g_askSince = GetTickCount64();
+            }
+        }
+        ReleaseSRWLockExclusive(&g_askLock);
+        if (!written) {
+            Log("sign-in: the request could not be written to %ls", wait->folder);
+            return E_GAMEUSER_RESOLVE_USER_ISSUE_REQUIRED;
         }
 
         ++wait->refs;
@@ -228,16 +188,19 @@ HRESULT CALLBACK Provider(XAsyncOp op, const XAsyncProviderData* data) noexcept
         if (thread == nullptr) {
             --wait->refs;
             TakeRequestBack(*wait);
-            return E_GAMEUSER_NO_DEFAULT_USER;
+            return E_GAMEUSER_RESOLVE_USER_ISSUE_REQUIRED;
         }
         ::CloseHandle(thread);
-        Log("sign-in %s: asked sake in %ls", wait->id, wait->folder);
+        Log("sign-in %s: %s sake in %ls", wait->id, joined ? "joined a request to" : "asked", wait->folder);
         return S_OK;
     }
+    case XAsyncOp::GetResult:
+        wait->payload.Write(data->buffer);
+        return S_OK;
     case XAsyncOp::Cancel:
+        // The request stays out, since another call may have joined it.
         if (Claim(wait)) {
             Log("sign-in %s: cancelled by the title", wait->id);
-            TakeRequestBack(*wait);
             ::XAsyncComplete(data->async, E_ABORT, 0);
         }
         return S_OK;
@@ -249,7 +212,45 @@ HRESULT CALLBACK Provider(XAsyncOp op, const XAsyncProviderData* data) noexcept
     }
 }
 
+struct Result {
+    HRESULT result;
+    Payload payload;
+};
+
+HRESULT CALLBACK CompleteNowProvider(XAsyncOp op, const XAsyncProviderData* data) noexcept
+{
+    Result* now = static_cast<Result*>(data->context);
+    switch (op) {
+    case XAsyncOp::Begin:
+        if (FAILED(now->result))
+            return now->result;
+        ::XAsyncComplete(data->async, now->result, now->payload.Size());
+        return S_OK;
+    case XAsyncOp::GetResult:
+        now->payload.Write(data->buffer);
+        return S_OK;
+    case XAsyncOp::Cleanup:
+        delete now;
+        return S_OK;
+    default:
+        return S_OK;
+    }
+}
+
 }  // namespace
+
+HRESULT CompleteNow(XAsyncBlock* async, const void* identity, const char* identityName, HRESULT result,
+                    Payload payload) noexcept
+{
+    Result* now = new (std::nothrow) Result{result, std::move(payload)};
+    if (now == nullptr)
+        return E_OUTOFMEMORY;
+    HRESULT hr = ::XAsyncBegin(async, now, identity, identityName, CompleteNowProvider);
+    // Only a failure before the provider ever ran; after that, its Cleanup deletes.
+    if (FAILED(hr))
+        delete now;
+    return hr;
+}
 
 // The wait is a thread of its own and never work on the caller's queue: terminating that
 // queue cancels whatever is still queued on it, so a caller that terminates it straight
@@ -259,13 +260,13 @@ HRESULT CALLBACK Provider(XAsyncOp op, const XAsyncProviderData* data) noexcept
 // XAsyncBegin holds off its termination until the call completes, and until then the
 // completion port only marks callbacks canceled rather than refusing them. A refusal would
 // be fatal: libHttpClient fails fast when it cannot post a completion.
-HRESULT AskSakeToSignIn(XAsyncBlock* async, const void* identity, const char* identityName) noexcept
+HRESULT AskSake(XAsyncBlock* async, const void* identity, const char* identityName, Finish finish) noexcept
 {
     Wait* wait = new (std::nothrow) Wait;
     if (wait == nullptr)
         return E_OUTOFMEMORY;
+    wait->finish = std::move(finish);
     HRESULT hr = ::XAsyncBegin(async, wait, identity, identityName, Provider);
-    // Only a failure before the provider ever ran; after that, its Cleanup releases.
     if (FAILED(hr))
         delete wait;
     return hr;

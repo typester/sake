@@ -36,22 +36,27 @@ public struct XboxDevice: Sendable {
 /// names it.
 public struct RelyingParty: Sendable, Hashable {
     public let name: String
+    /// What a URL's host has to be, or end with after a dot, for its token to be this one.
+    public let hosts: [String]
     /// Minted with the device's own token and bound to its key. A service that checks
     /// signatures then refuses the token on any request the key did not sign, and a title's
     /// runtime has no key, so only a service that wants a device gets one. See docs/gdk.md.
     public let boundToDevice: Bool
 
-    public init(_ name: String, boundToDevice: Bool = false) {
+    public init(_ name: String, hosts: [String], boundToDevice: Bool = false) {
         self.name = name
+        self.hosts = hosts
         self.boundToDevice = boundToDevice
     }
 
     /// The one whose token names the person, and which every sign-in asks for.
-    public static let identity = RelyingParty("http://xboxlive.com")
+    public static let identity = RelyingParty("http://xboxlive.com", hosts: ["xboxlive.com"])
 
     /// The community stand-in's README says PlayFab refuses to link an account whose token
     /// came without a device, and the stand-in's is the one sign-in known to reach the game.
-    public static let playFab = RelyingParty("http://playfab.xboxlive.com/", boundToDevice: true)
+    public static let playFab = RelyingParty(
+        "http://playfab.xboxlive.com/", hosts: ["playfabapi.com"], boundToDevice: true
+    )
 }
 
 /// One sign-in from start to finish: a refresh token if there is one that still works,

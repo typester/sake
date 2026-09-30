@@ -3,11 +3,12 @@
 A title built on Microsoft's Game Development Kit (GDK) calls into `xgameruntime.dll`, the
 Gaming Runtime that Xbox Gaming Services installs on Windows, for its task queues, its user
 and its tokens. Wine has neither. This file is how sake means to provide both itself: a
-runtime DLL it builds, and a sign-in it performs. **The runtime exists, in `xgameruntime/`,
-and asks sake to sign the person in; sake does, through files in the bottle, and the runtime
-does not hand the user to the game yet. It asks at the wrong moment, before the game's
-window is up (below).** What was measured says so and gives the date; the rest is a
-decision or an open question.
+runtime DLL it builds, and a sign-in it performs. **Both exist, and Minecraft Dungeons II
+reached character select with them and nothing else on 2026-09-30: the runtime, in
+`xgameruntime/`, asks sake to sign the person in when the game first wants a token, sake does
+it through files in the bottle, and the runtime hands the game its user and tokens. The app
+does not yet build or place the runtime.** What was measured says so and gives the date; the
+rest is a decision or an open question.
 
 ## What was measured
 
@@ -193,6 +194,49 @@ aside for the game's runs.
   that the game would already be showing "SIGNING IN .." while it waited. It had not drawn
   anything yet.
 
+Later on 2026-09-30 the runtime began answering `XUser` itself: the silent add at once, with
+a placeholder until there is a session, and sake asked at the first token request.
+
+- **The slots, first.** Every `XUser` thunk in `libHttpClient.GDK.dll`, 44 of them, and the
+  one for `XUserGamertag`, reach the slot `runtime.h` gives that function with the number of
+  arguments its signature has. That edition asks for `XUser` under `26f3c674`, which the
+  runtime answers from the same table as the base ID the game uses.
+- **The game sent nothing until the runtime sent the notifications the stand-in sends.** With
+  the add answered, it drew its window and "SIGNING IN .." and sent nothing, not even a
+  question about a URL's TLS. The stand-in, run from outside in a probe, showed two things
+  the runtime was not sending:
+  - After the silent add, the first dispatch of the completion port of the queue the title
+    registered for `XUser` changes brings one `SignedInAgain` for local user 1. With that
+    added, the game answered it with `FindUserByLocalId` and still sent nothing.
+  - Registering for connectivity hint changes brings one notification, also on the
+    completion port, with the hint `XNetworkingGetConnectivityHint` gives. Microsoft's
+    reference for `XNetworkingRegisterConnectivityHintChanged` says so as well: it "sends an
+    initial notification callback". The game registers twice, the second time from the
+    module that sends its HTTP, and with this notification added as well it sent its first
+    request five seconds after the change event.
+
+  Whether the game needs `SignedInAgain` too was not tried: every run that got as far had
+  both.
+- **The game, with no sign-in kept.** Its window came up, then "SIGNING IN ..", and the game
+  logged in to PlayFab with Steam and added, by ID, the XUID PlayFab links to that Steam
+  account. Its first token request, for `https://playfabapi.com/`, came 23 seconds after
+  launch, and sake picked it up a second later: the panel and the browser opened while the
+  game was showing its sign-in, the way the stand-in's sign-in looks. The owner signed in,
+  and 62.6 seconds after the request sake had a session and the game its token; the game's
+  telemetry went on meanwhile. Tokens for `api.minecraftservices.com`, `rta.xboxlive.com`,
+  `peoplehub.xboxlive.com` and `userpresence.xboxlive.com` then came from the session at
+  once, and the game went on through `vex.minecraftservices.com` to character select.
+- **The game again, with the sign-in kept and the session good.** The silent add returned the
+  person, every token came from the session, and the game reached character select with no
+  panel and no sign-in.
+- **Unsigned tokens were enough.** All 20 token requests were the UTF-8 kind, and every token
+  went out with no signature: PlayFab's bound to the device, the rest bound to nothing.
+  `multiplayeractivity.xboxlive.com` looks to have refused its token, since the game asked
+  again with `ForceRefresh`, four requests at a time. Each such wave cost sake a silent
+  refresh of two to three seconds, and whether the calls got through afterwards the runtime
+  cannot see. The stand-in's failed, with an error of its own, and neither run needed them
+  for character select.
+
 ## WineGDK
 
 `Weather-OS/WineGDK` implements `xgameruntime` inside Wine 11.14. Its author declares their
@@ -236,8 +280,18 @@ tokens are minted for `http://xboxlive.com`, for `http://playfab.xboxlive.com/`,
 whatever a table sake keeps names for the title, which for Minecraft Dungeons II is
 `rp://api.minecraftservices.com/`. Only PlayFab's is bound to a device, because the
 stand-in's README says PlayFab will not link an account otherwise; the rest are bound to
-nothing, and the device's key never leaves sake. The runtime asks at the silent add today,
-which is the wrong place (above), and the third step of the order moves it.
+nothing, and the device's key never leaves sake.
+
+**The user the runtime hands over.** One user, whose handle is one object's address. The
+silent add returns at once: with the person the session names while its identity token lasts
+five more minutes, and otherwise with a placeholder, XUID 1, the way the stand-in answers,
+which takes the XUID the game then adds by ID. After it, the runtime sends the one
+`SignedInAgain` and, on every registration for connectivity changes, the initial
+notification, both as the stand-in does (above). A token request looks the URL's host up in
+the session; a token that is missing, lasts less than five minutes or is asked for with
+`ForceRefresh` sends the runtime to sake, and a URL no relying party covers gets
+`E_GAMEUSER_NO_TOKEN_REQUIRED`. Every answer is completed inside `XAsyncBegin` or from the
+runtime's own thread, never from the caller's queue.
 
 **What sake keeps.** The refresh token and the device, in `~/Library/Sake/sign-ins`, one file
 per app ID, readable by the person alone: not the Keychain, which asks for the login password
@@ -254,8 +308,12 @@ is `crossover`. The runtime writes `request`, holding an ID of its own; sake wri
 and, once the person is signed in, `session`. Each file is `key value` lines under a first
 line of `sake 1`, and each is written whole and renamed into place. `answer` says `waiting`
 as soon as sake has the request, then `signed-in`, `failed` with a reason, or `cancelled`.
-`session` carries the XUID, gamertag, user hash, age group and privileges, and a line `token
-<relying party> <expiry in Unix seconds> <token>` for each relying party. The runtime gives
+`session` carries the XUID, gamertag, user hash, age group and privileges, a line `token
+<relying party> <expiry in Unix seconds> <token>` for each relying party, and a line
+`endpoint <host> <relying party>` for each host a relying party covers: the host itself, or
+one ending in it after a dot, so that the runtime keeps no table of its own. A title asks
+for several tokens at once and there is one `request` per title, so a request made while
+another is out joins it rather than replacing it. The runtime gives
 up when nothing says `waiting` within 10 seconds, and waits 20 minutes at most for the rest,
 a device code lasting 15. Files, because a Windows DLL cannot reach a socket sake listens on:
 Wine's Winsock converts no `AF_UNIX` address (CrossOver 26.3.0's sources, read 2026-09-29).
@@ -267,36 +325,43 @@ The refresh token stays out of the bottle.
   own table, which sake cannot read without a title token (above). The default table covers
   `playfabapi.com` and `*.xboxlive.com`; anything else a title calls needs a table sake keeps
   for that title, which for Minecraft Dungeons II is `api.minecraftservices.com` →
-  `rp://api.minecraftservices.com/`. Whether that is what the game's own calls need, the first
-  run with a signed-in user will show.
+  `rp://api.minecraftservices.com/`. That was what the game's own calls needed: they reached
+  character select on 2026-09-30 (above).
 - ~~**Which call starts the sign-in.**~~ **Answered on 2026-09-30**, above: not the silent
   `XUserAddAsync`, which holds the game's start until the sign-in is done, before the game
   has a window; the first token request, the way the stand-in does it, with the silent add
   returning at once.
-- **Whether a key goes into the bottle.** Microsoft's page says every call to an Xbox service
-  carries a signature from the key its token is bound to. A token bound to nothing needed none
-  at the two services measured; if the ones the game calls agree, the runtime is handed
-  unbound tokens and no key leaves sake. If one does not, the key can be one made for that
-  launch rather than one kept. The stand-in's log points the first way: none of the 416
-  requests whose headers it recorded carried a `Signature`, and the game reached character
-  select. sake binds PlayFab's token alone and keeps the key; the third step shows whether
-  the game's services agree.
-- **Whether tokens outlive a session.** XSTS tokens last 16 hours and the user token 96; a
-  session longer than that, or a Mac asleep through it, needs the runtime to ask sake for
-  fresh ones. It can ask again through the same files; when it should is the third step's.
+- ~~**Whether a key goes into the bottle.**~~ **Answered for Minecraft Dungeons II on
+  2026-09-30**, above: no. Microsoft's page says every call to an Xbox service carries a
+  signature from the key its token is bound to, and the stand-in's log had none of the 416
+  requests whose headers it recorded carrying a `Signature`. With sake's unsigned tokens,
+  PlayFab's bound to the device and the rest to nothing, the game reached character select.
+  Whether a signature, or a title token, is what the multiplayer activity service wants
+  (below) is not known.
+- **Whether tokens outlive a session.** XSTS tokens last 16 hours and the user token 96. The
+  runtime asks sake again for a token with less than five minutes left, and a kept sign-in
+  makes that silent, but no session has yet run long enough to need it.
 - ~~**The Keychain under ad-hoc signing.**~~ **Answered on 2026-09-29**, above: it asks for
   the login password on every read, Always Allow or not, so what sake keeps is a file.
 - **sake has to be running.** A request that nobody picks up fails after 10 seconds, and the
   game goes on without a user. A sake quit while its game runs cannot answer; whether
   quitting should be refused, or warned about, while a title runs is open.
+- **Whether the game needs `SignedInAgain`.** The runtime sends it because the stand-in does,
+  and the game answers it; a run with the connectivity notification and no change event would
+  say whether it has to.
 - ~~**The interface layout.**~~ **Answered for Minecraft Dungeons II on 2026-09-29**, above:
   every version it names is one WineGDK lists. A title built with a later edition may name
   another; the runtime refuses a version it does not know and logs it, which is where to
   look.
 - **The game executable's own thunks.** Its code is encrypted on disk, so only the calls it
   made have been checked.
-- **Security information for a URL** is answered with TLS 1.2 and no pinned certificates,
-  and only a probe has asked for it: the game sends no request before it has a user.
+- **Security information for a URL** is answered with TLS 1.2 and no pinned certificates.
+  The game asks for it, in UTF-16, before every request it sends, and on 2026-09-30 its
+  requests went through with that answer.
+- **Multiplayer activity.** `multiplayeractivity.xboxlive.com` looks to refuse sake's token,
+  and each refusal costs a silent refresh through sake (above), because the runtime takes a
+  `ForceRefresh` at its word. Neither run needed the service, and the stand-in's calls to it
+  failed too.
 - **How to pin libHttpClient.** The tarball GitHub generates for the commit hashed the same an
   hour apart on 2026-09-29, but GitHub does not promise that; SakeKit may have to pin the
   commit itself.
@@ -312,11 +377,12 @@ The refresh token stays out of the bottle.
 2. **The sign-in in SakeKit**, measured against the relying parties above. **Done on
    2026-09-30**: `XboxSignIn` goes from a refresh token or a code to the tokens, the runtime
    asks sake through the bottle, sake shows the code and opens the browser, and the sign-in
-   is kept in `~/Library/Sake/sign-ins`. The runtime asks at the silent add, which the next
-   step moves.
-3. **`XUser` over the session file**, to character select. The silent add returns at once,
-   with the person when the session in the bottle is still good and with a placeholder the
-   way the stand-in does when it is not, and the sign-in starts at the first token request.
+   is kept in `~/Library/Sake/sign-ins`. The runtime asked at the silent add, which the next
+   step moved.
+3. **`XUser` over the session file**, to character select. **Done on 2026-09-30** (above):
+   the silent add returns at once, with the person when the session in the bottle is still
+   good and with a placeholder the way the stand-in does when it is not, and the sign-in
+   starts at the first token request.
 4. **SakeKit builds and places the runtime**: `xgameruntime/` compiled with the engine's
    toolchain, libHttpClient fetched as a pinned source, and the DLL put in the `system32` of a
    bottle whose title has a `MicrosoftGame.config`. Last, because the steps before it need
