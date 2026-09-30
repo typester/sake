@@ -1,7 +1,7 @@
 import Foundation
 
-/// The steps of first-time setup, in the order their prerequisites force. Nothing here is
-/// a preference: each one needs what the one above it produced.
+/// The steps of first-time setup. None comes before a step whose product it needs; the GDK
+/// runtime needs only the sources, and goes after D3DMetal so that the bottle stays last.
 public enum SetupStep: String, CaseIterable, Sendable, Identifiable {
     case machine
     case sources

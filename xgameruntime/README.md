@@ -90,6 +90,17 @@ an archive of a commit and not its bytes, which is why SakeKit checks what it un
 instead. The DLL lands in `target/xgameruntime/`: about 900 KB, importing the UCRT, KERNEL32
 and ole32 and nothing else.
 
+A new commit needs a new pin for what the archive unpacks to, `GDKRuntimeBuilder.pinnedLibHttpClient`.
+This prints it for an unpacked tree the way SakeKit computes it, and gave `08c0f152…` for `7ead73f6`
+on 2026-09-30, the value SakeKit then matched against a real download:
+
+```sh
+cd target/libHttpClient-<commit>
+find . -type f -not -path '*/.*' | sed 's|^\./||' | LC_ALL=C sort |
+  while IFS= read -r f; do printf '%s\0%s\n' "$f" "$(shasum -a 256 "$f" | cut -d' ' -f1)"; done |
+  shasum -a 256
+```
+
 ## The log
 
 Every process that loads it appends to `%TEMP%\xgameruntime.log`, which in a sake bottle

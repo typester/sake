@@ -405,6 +405,11 @@ The refresh token stays out of the bottle.
   and each refusal costs a silent refresh through sake (above), because the runtime takes a
   `ForceRefresh` at its word. Neither run needed the service, and the stand-in's calls to it
   failed too.
+- **Linking a Steam account PlayFab does not know yet.** Every run with sake's sign-in found the
+  owner's Steam login already linked to their XUID. The stand-in had signed the same account in
+  before sake's first run, and whether the link came from that is not known. The stand-in's
+  README says PlayFab will not link an account without a token bound to a device, which is why
+  sake binds PlayFab's; an account PlayFab has not seen has not been tried.
 - ~~**How to pin libHttpClient.**~~ **Answered on 2026-09-30**: by what it unpacks to. GitHub's
   page on downloading source code archives, read that day, promises that an archive of a
   commit ID always has the same files, and not the same bytes: the compression may change,

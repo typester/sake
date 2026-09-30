@@ -67,7 +67,7 @@ private func finish(_ step: SetupStep, in paths: Paths) throws {
     defer { remove(paths) }
     let setup = Setup(paths: paths, runtimeSources: nil)
 
-    // The order is the dependency order, so this also fails if the cases are reordered.
+    // The order Setup declares, so this also fails if the cases are reordered.
     let expected: [SetupStep] = [.sources, .prefix, .wine, .d3dMetal, .gdkRuntime, .bottle]
     for (index, step) in expected.enumerated() {
         #expect(setup.current(machineIsReady: true) == step)
