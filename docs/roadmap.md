@@ -228,12 +228,15 @@ every string. The panes scroll now, which keeps the modifier — it is there so 
 wraps instead of being truncated — and bounds what the demand can do. The setup wizard had
 been doing this from the start.
 
-### Phase 5 — GDK titles (planned)
+### Phase 5 — GDK titles (under way)
 
 A runtime DLL and a sign-in of sake's own, so that a title built on Microsoft's GDK runs
 without Gaming Services or a community stand-in. `gdk.md` has what was measured, the design
 and the order. The first piece is in: two WinHTTP stubs, without which the GDK's HTTP client
-drops every request (2026-09-29, `runtime.md`).
+drops every request (2026-09-29, `runtime.md`). The second is the runtime itself, in
+`xgameruntime/`: built by hand and put in a bottle's `system32` the same day, it took
+Minecraft Dungeons II past its launcher's check and as far as its sign-in with no stand-in.
+The app neither builds nor places it yet.
 
 ## The Swift/subprocess boundary
 

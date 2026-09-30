@@ -110,10 +110,14 @@ happy would hide the one thing about it that has to be visible.
 
 For titles built on Microsoft's GDK, sake provides its own stand-in for the Gaming Runtime
 (`gdk.md`). It never ships, downloads or copies Microsoft's GDK or Gaming Services, and it
-takes nothing from the community stand-in, whose repository has no licence. Code that
-starts from WineGDK comes from the part its author declared CC0 and says so in its header.
-Signing in uses the title's own `MSAAppId` from its `MicrosoftGame.config`; sake signs in as
-no other application.
+takes nothing from the community stand-in, whose repository has no licence. Its task queue
+and `XAsync` are libHttpClient's, which is Microsoft's and MIT-licensed: fetched at a pinned
+commit rather than kept in this repository, and contained in any DLL built from it, so
+libHttpClient's licence goes wherever that DLL goes. From WineGDK it takes facts and no text:
+which IDs the interfaces have and the order of their slots. This section used to say code
+would start from the part of WineGDK its author declared CC0; the part worth taking turned out
+to be libHttpClient's, under an LGPL header there (`gdk.md`). Signing in uses the title's own
+`MSAAppId` from its `MicrosoftGame.config`; sake signs in as no other application.
 
 ## Why D3DMetal cannot simply be avoided
 

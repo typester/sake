@@ -100,6 +100,11 @@ messages. Measured 2026-09-19 (CLT 27.0, Swift 6.4, macOS 27.0):
 stays thin. The tests exercise `SakeKit`, so logic that drifts into a view is logic that
 stops being tested.
 
+`xgameruntime/` is not Swift and SwiftPM does not build it: it is the Windows DLL that GDK
+titles load in place of Gaming Services, C++ compiled with the engine's llvm-mingw by its own
+`Makefile`, and its `README.md` has the commands. `scripts/test.sh` does not reach it; a
+title in a bottle is what tests it, and `docs/gdk.md` records what that measured.
+
 ## Deployment target
 
 macOS 15, in both `Package.swift` and `Info.plist.template` — keep them in step. The
