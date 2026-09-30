@@ -8,7 +8,9 @@ reached character select with them and nothing else on 2026-09-30: the runtime, 
 `xgameruntime/`, asks sake to sign the person in when the game first wants a token, sake does
 it through files in the bottle, and the runtime hands the game its user and tokens. Later that
 day the app built the runtime in setup and put it in the bottle itself, and the game reached
-character select again.** What was measured says so and gives the date; the rest is a
+character select again.** That evening its account link worked from the Mac too, once PlayFab's
+token came from the same user token as the rest, and two players who joined a party by code
+played a mission together. What was measured says so and gives the date; the rest is a
 decision or an open question.
 
 ## What was measured
@@ -257,6 +259,37 @@ setup, then Steam started from sake in the `ex` bottle.
   and with the sign-in kept the game reached character select, every token from the session.
   The start after that found the copy already there.
 
+On the evening of 2026-09-30 the game's account link and its play with others were measured in
+the `ex` bottle, with sake's runtime in `system32` and the game's WinHTTP traced, and against
+the owner's Windows PC, where Steam runs the same game on Gaming Services.
+
+- **Account link is the game's own.** Its settings link the Steam account to a Microsoft one
+  through Mojang's service: `POST vex.minecraftservices.com/account/steam/link` with the
+  PlayFab and Minecraft tokens the runtime hands over and a Steam ticket, and `…/unlink` to
+  undo it. With sake's tokens, unlinking worked and linking answered 500 with no reason in its
+  body, nine times in three tries, which the game showed as "Error code: 0029". On Windows the
+  same link worked. The person's characters stayed while the accounts were unlinked.
+- **The user hash was the difference.** An XSTS token minted from a user token bound to the
+  device's key names a different user hash from one minted from the unbound user token, and
+  the runtime puts one user hash, the identity's, into every `Authorization` value. sake had
+  minted PlayFab's from the bound one, so the game sent PlayFab's token under another hash.
+  Minted instead from the unbound user token, with the device's token beside it and the
+  request signed by the device's key, the link answered 200 and the game said the accounts
+  were linked. Minecraft's token was bound to nothing throughout, so the link does not need a
+  title claim.
+- **Multiplayer activity needs a title.** `multiplayeractivity.xboxlive.com` answered 401 with
+  `"debugMessage": "Missing title Id claim."` to sake's token, bound or unbound, signed or not.
+  XSAPI asks for a new token with `ForceRefresh` on every 401, so each wave cost sake a silent
+  sign-in, and enough of them brought 429.
+- **No title token through SISU's page either.** SISU's `/authenticate` hands out a session for
+  this `MSAAppId` without checking the redirect. The page it returns sends the person to
+  `oauth20_authorize.srf` with `ms-xal-00000000497c1b94://auth`, which login.live.com refuses as
+  not registered for the app, before anyone signs in, and `/authorize` refuses the device
+  code's token with the session or without.
+- **Playing together.** Parties, invites and matchmaking are Mojang's, `/spicewood/…` on the
+  same service, and the game servers PlayFab's. Joining a party by code worked both ways with
+  the game on a Nintendo Switch 2, and with the Mac hosting, the two played a mission together.
+
 ## WineGDK
 
 `Weather-OS/WineGDK` implements `xgameruntime` inside Wine 11.14. Its author declares their
@@ -322,8 +355,10 @@ title declares that ID for exactly this, and sake signs in as no other applicati
 tokens are minted for `http://xboxlive.com`, for `http://playfab.xboxlive.com/`, and for
 whatever a table sake keeps names for the title, which for Minecraft Dungeons II is
 `rp://api.minecraftservices.com/`. Only PlayFab's is bound to a device, because the
-stand-in's README says PlayFab will not link an account otherwise; the rest are bound to
-nothing, and the device's key never leaves sake.
+stand-in's README says PlayFab will not link an account otherwise, and it comes from the same
+user token as the rest: the runtime labels every token with one user hash, and a user token
+bound to the key would give PlayFab's another, which is what made the link fail until
+2026-09-30 (above). The rest are bound to nothing, and the device's key never leaves sake.
 
 **The user the runtime hands over.** One user, whose handle is one object's address. The
 silent add returns at once: with the person the session names while its identity token lasts
@@ -379,8 +414,7 @@ The refresh token stays out of the bottle.
   signature from the key its token is bound to, and the stand-in's log had none of the 416
   requests whose headers it recorded carrying a `Signature`. With sake's unsigned tokens,
   PlayFab's bound to the device and the rest to nothing, the game reached character select.
-  Whether a signature, or a title token, is what the multiplayer activity service wants
-  (below) is not known.
+  The multiplayer activity service wants a title token (below), not a signature.
 - **Whether tokens outlive a session.** XSTS tokens last 16 hours and the user token 96. The
   runtime asks sake again for a token with less than five minutes left, and a kept sign-in
   makes that silent, but no session has yet run long enough to need it.
@@ -401,15 +435,15 @@ The refresh token stays out of the bottle.
 - **Security information for a URL** is answered with TLS 1.2 and no pinned certificates.
   The game asks for it, in UTF-16, before every request it sends, and on 2026-09-30 its
   requests went through with that answer.
-- **Multiplayer activity.** `multiplayeractivity.xboxlive.com` looks to refuse sake's token,
-  and each refusal costs a silent refresh through sake (above), because the runtime takes a
-  `ForceRefresh` at its word. Neither run needed the service, and the stand-in's calls to it
-  failed too.
-- **Linking a Steam account PlayFab does not know yet.** Every run with sake's sign-in found the
-  owner's Steam login already linked to their XUID. The stand-in had signed the same account in
-  before sake's first run, and whether the link came from that is not known. The stand-in's
-  README says PlayFab will not link an account without a token bound to a device, which is why
-  sake binds PlayFab's; an account PlayFab has not seen has not been tried.
+- ~~**Multiplayer activity.**~~ **Answered on 2026-09-30**, above: it wants a title Id claim,
+  so a title token, and sake has none: XAST refuses the device code's token, so does SISU's
+  `/authorize`, and SISU's page wants a redirect this app has not registered. Each refusal
+  still costs a silent sign-in through sake, because the runtime takes a `ForceRefresh` at its
+  word. The game is played without it, and with others by party code.
+- **Linking a Steam account PlayFab does not know yet.** Unlinking and linking again works
+  since 2026-09-30 (above), with PlayFab's token bound to the device the way the stand-in's
+  README asks; a PlayFab token bound to nothing was not tried, and neither was an account
+  PlayFab has not seen.
 - ~~**How to pin libHttpClient.**~~ **Answered on 2026-09-30**: by what it unpacks to. GitHub's
   page on downloading source code archives, read that day, promises that an archive of a
   commit ID always has the same files, and not the same bytes: the compression may change,

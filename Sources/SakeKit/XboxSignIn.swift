@@ -122,24 +122,21 @@ public struct XboxSignIn: Sendable {
         return try await microsoft.waitForApproval(of: code)
     }
 
-    /// A bound token has to come from a user token bound to the same key, so a sign-in that
-    /// mints both kinds asks for two user tokens.
+    /// Every token comes from the one unbound user token: one bound to the key would give its
+    /// tokens a user hash of their own, and the runtime labels them all with the identity's.
+    /// See docs/gdk.md.
     private func xboxSession(accessToken: String) async throws -> XboxSession {
         let user = try await xbox.userToken(accessToken: accessToken, key: nil)
-        var bound: (device: XboxDevice, user: XboxToken, token: XboxToken)?
+        var bound: (device: XboxDevice, token: XboxToken)?
         if let device, relyingParties.contains(where: \.boundToDevice) {
-            bound = (
-                device,
-                try await xbox.userToken(accessToken: accessToken, key: device.key),
-                try await xbox.deviceToken(key: device.key, deviceID: device.id)
-            )
+            bound = (device, try await xbox.deviceToken(key: device.key, deviceID: device.id))
         }
 
         var tokens: [String: XboxToken] = [:]
         for relyingParty in relyingParties {
             if relyingParty.boundToDevice, let bound {
                 tokens[relyingParty.name] = try await xbox.xstsToken(
-                    relyingParty: relyingParty.name, userToken: bound.user, deviceToken: bound.token,
+                    relyingParty: relyingParty.name, userToken: user, deviceToken: bound.token,
                     key: bound.device.key
                 )
             } else {

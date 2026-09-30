@@ -439,7 +439,7 @@ private func xboxSignIn(
 
 @Test func aRefreshTokenSignsInAgainWithoutACodeAndTheDeviceBindsOnlyWhatWantsIt() async throws {
     let server = FakeServer([
-        (200, tokenAnswer), (200, userAnswer), (200, userAnswer), (200, deviceAnswer),
+        (200, tokenAnswer), (200, userAnswer), (200, deviceAnswer),
         (200, xstsAnswer), (200, playfabAnswer),
     ])
     let device = XboxDevice(key: ProofKey(), id: UUID())
@@ -454,18 +454,19 @@ private func xboxSignIn(
     #expect(result.refreshToken == "the-refresh-token")
 
     let users = server.requests.filter { $0.url?.host() == "user.auth.xboxlive.com" }
-    #expect(users.count == 2)
+    #expect(users.count == 1)
     #expect(users.first?.value(forHTTPHeaderField: "Signature") == nil)
-    #expect(try signatureHolds(try #require(users.last), path: "/user/authenticate", key: device.key))
 
     let xsts = server.requests.filter { $0.url?.host() == "xsts.auth.xboxlive.com" }
     #expect(try xsts.map { try json($0)["RelyingParty"] as? String } == [
         "http://xboxlive.com", "http://playfab.xboxlive.com/",
     ])
     let identity = try #require(try json(xsts[0])["Properties"] as? [String: Any])
+    #expect(identity["UserTokens"] as? [String] == ["the-user-token"])
     #expect(identity["DeviceToken"] == nil)
     #expect(xsts[0].value(forHTTPHeaderField: "Signature") == nil)
     let playFab = try #require(try json(xsts[1])["Properties"] as? [String: Any])
+    #expect(playFab["UserTokens"] as? [String] == ["the-user-token"])
     #expect(playFab["DeviceToken"] as? String == "the-device-token")
     #expect(try signatureHolds(xsts[1], path: "/xsts/authorize", key: device.key))
 }
@@ -554,7 +555,7 @@ private func permissions(of url: URL) throws -> Int? {
     defer { remove(paths) }
     let request = try titleAsking(in: paths)
     let server = FakeServer([
-        (200, codeAnswer), (200, tokenAnswer), (200, userAnswer), (200, userAnswer), (200, deviceAnswer),
+        (200, codeAnswer), (200, tokenAnswer), (200, userAnswer), (200, deviceAnswer),
         (200, xstsAnswer), (200, playfabAnswer),
     ])
 
@@ -596,7 +597,7 @@ private func permissions(of url: URL) throws -> Int? {
         XboxAccount(refreshToken: "an-old-refresh-token", device: device), for: "0000000012345678"
     )
     let server = FakeServer([
-        (200, tokenAnswer), (200, userAnswer), (200, userAnswer), (200, deviceAnswer),
+        (200, tokenAnswer), (200, userAnswer), (200, deviceAnswer),
         (200, xstsAnswer), (200, playfabAnswer),
     ])
 
@@ -639,7 +640,7 @@ private func permissions(of url: URL) throws -> Int? {
         for: "0000000012345678"
     )
     let server = FakeServer([
-        (200, tokenAnswer), (200, userAnswer), (200, userAnswer), (200, deviceAnswer),
+        (200, tokenAnswer), (200, userAnswer), (200, deviceAnswer),
         (401, #"{"XErr":2148916238}"#),
     ])
 
