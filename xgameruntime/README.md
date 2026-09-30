@@ -4,8 +4,10 @@ sake's own `xgameruntime.dll`: the Gaming Runtime that a title built on Microsof
 loads. On Windows, Xbox Gaming Services installs that DLL; Wine has none, and this is what
 sake puts in its place. `docs/gdk.md` has the design and what has been measured with it.
 
-Nobody is signed in yet. `XUserAddAsync` fails as though no user were signed in, which is
-as far as the first step of `docs/gdk.md`'s order goes.
+The silent `XUserAddAsync` asks sake to sign the person in, through files in the bottle that
+`docs/gdk.md` describes, and fails once sake has answered: the user is not handed to the
+title yet. It is also the wrong place to ask, since it holds the title's start until the
+sign-in is done; `docs/gdk.md` has where the sign-in moves.
 
 ## How a title reaches it
 
@@ -27,7 +29,7 @@ vtable, and releases it.
 | XNetworking | online, unmetered; TLS 1.2 and no pinned certificates for every URL |
 | XGame | the title ID from the title's `MicrosoftGame.config` |
 | XGameProtocol, XGameInvite | registrations accepted, never fired |
-| XUser, XUserGamertag, XUserDevice | no user: adding one fails, silently or as a closed sign-in window |
+| XUser, XUserGamertag, XUserDevice | no user yet: the silent add asks sake to sign in and then fails; any other add fails as a closed sign-in window |
 
 A class answers every interface version it is known by from one table that carries all of
 their slots. Anything else is refused and logged.

@@ -210,7 +210,7 @@ uint32_t TitleIdFromConfig() noexcept
 
 HRESULT GetXboxTitleId(void*, uint32_t* titleId) noexcept
 {
-    static const uint32_t id = TitleIdFromConfig();
+    const uint32_t id = TitleId();
     SAKE_TRACE("-> %08X", id);
     if (titleId == nullptr)
         return E_POINTER;
@@ -272,7 +272,13 @@ constexpr GUID kRegistration95fd18d2Iids[] = {kRegistration95fd18d2Class, kRegis
 
 }  // namespace
 
-const Object kXGameRuntimeFeature = {&kFeatureVtbl, "XGameRuntimeFeature", kFeatureIids, std::size(kFeatureIids)};
+uint32_t TitleId() noexcept
+{
+    static const uint32_t id = TitleIdFromConfig();
+    return id;
+}
+
+const Object kXGameRuntimeFeature ={&kFeatureVtbl, "XGameRuntimeFeature", kFeatureIids, std::size(kFeatureIids)};
 const Object kXError = {&kErrorVtbl, "XError", kErrorIids, std::size(kErrorIids)};
 const Object kXSystem = {&kSystemVtbl, "XSystem", kSystemIids, std::size(kSystemIids)};
 const Object kXSystemAnalytics = {&kAnalyticsVtbl, "XSystemAnalytics", kAnalyticsIids, std::size(kAnalyticsIids)};

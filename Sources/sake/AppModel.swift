@@ -120,6 +120,12 @@ final class AppModel {
     /// installed in two bottles, so an id on its own names two different things.
     var titleStatus: [RunningTitle: TitleStatus] = [:]
 
+    /// What the sign-in panel shows while a GDK title waits for its user.
+    var signInPrompt: SignInPrompt?
+    @ObservationIgnored private var watchingSignIns: Task<Void, Never>?
+    @ObservationIgnored private var signingIn: Task<Void, Never>?
+    @ObservationIgnored private let signInPanel = SignInPanel()
+
     let fetching = Run()
     let building = Run()
     let buildingWine = Run()
@@ -772,6 +778,51 @@ final class AppModel {
         case .exited(let status): titleStatus[running] = .exited(status: status)
         case .failed(let reason, _): titleStatus[running] = .failed(reason)
         case .finished: break
+        }
+    }
+
+    /// Once, however often the library appears: answers each GDK title that asks for its
+    /// user, one request at a time. See docs/gdk.md.
+    func watchForSignIns() {
+        guard watchingSignIns == nil else { return }
+        watchingSignIns = Task {
+            for await request in GDKMailbox.watch(paths) {
+                let work = Task {
+                    for await event in GDKSignIn(request: request, paths: self.paths).run() {
+                        self.apply(event)
+                    }
+                }
+                signingIn = work
+                await work.value
+                signingIn = nil
+            }
+        }
+    }
+
+    /// The game is told, and goes on without a user.
+    func cancelSignIn() {
+        signingIn?.cancel()
+        dismissSignIn()
+    }
+
+    func dismissSignIn() {
+        signInPrompt = nil
+        signInPanel.close()
+    }
+
+    private func apply(_ event: GDKSignInEvent) {
+        switch event {
+        case .code(let code, let title):
+            signInPrompt = .code(code, title: title)
+            signInPanel.show(self)
+            NSWorkspace.shared.open(code.verificationURL)
+        case .failed(let reason, let title):
+            signInPrompt = .failed(reason: reason, title: title)
+            signInPanel.show(self)
+        case .signedIn, .cancelled:
+            dismissSignIn()
+        case .finished:
+            break
         }
     }
 }

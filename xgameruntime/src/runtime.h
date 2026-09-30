@@ -28,6 +28,13 @@ constexpr HRESULT kUnknownSlot = static_cast<HRESULT>(0x89240100);
 
 XTaskQueueRegistrationToken NextToken() noexcept;
 
+// From the title's MicrosoftGame.config, or 0 when there is none.
+uint32_t TitleId() noexcept;
+
+// Begins `async` as a call that asks sake to sign the person in and completes when sake
+// answers, through the files docs/gdk.md describes.
+HRESULT AskSakeToSignIn(XAsyncBlock* async, const void* identity, const char* identityName) noexcept;
+
 // Every object is a static singleton whose first member is its vtable, which is the whole
 // of COM's layout. The vtables are structs of function pointers rather than C++ virtual
 // classes, because clang's mingw target does not lay out or call virtual methods the way

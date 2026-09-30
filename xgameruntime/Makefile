@@ -9,7 +9,7 @@ LIBHTTPCLIENT ?= $(error LIBHTTPCLIENT must name an unpacked libHttpClient tree)
 OUT ?= ../target/xgameruntime
 
 TASK = AsyncLib TaskQueue ThreadPool_win32 WaitTimer_win32
-OWN = log main threading system networking user
+OWN = log main threading system networking user signin
 
 CXXFLAGS = -std=c++20 -O2 -DNDEBUG -Isrc -I$(LIBHTTPCLIENT)/Include -I$(LIBHTTPCLIENT)/Source/Task
 OBJS = $(TASK:%=$(OUT)/obj/libHttpClient/%.o) $(OWN:%=$(OUT)/obj/%.o)

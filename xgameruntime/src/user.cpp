@@ -6,15 +6,9 @@ namespace {
 
 constexpr uint32_t kAddDefaultUserSilently = 0x1;
 
-// There is no user yet: signing in is the next step (docs/gdk.md). Every add fails, and
-// fails through XAsyncBegin, which completes the call when Begin fails. A call that never
-// completed would block its queue's termination, and a title waits on that.
-HRESULT CALLBACK FailSilentAdd(XAsyncOp op, const XAsyncProviderData*) noexcept
-{
-    return op == XAsyncOp::Begin ? E_GAMEUSER_NO_DEFAULT_USER : S_OK;
-}
-
-// As if the sign-in window had been closed.
+// No user is handed to the title yet (docs/gdk.md). An add that may show a window fails as
+// though it had been closed, through XAsyncBegin, which completes the call when Begin fails.
+// A call that never completed would block its queue's termination, and a title waits on that.
 HRESULT CALLBACK FailInteractiveAdd(XAsyncOp op, const XAsyncProviderData*) noexcept
 {
     return op == XAsyncOp::Begin ? E_ABORT : S_OK;
@@ -54,8 +48,9 @@ HRESULT GetMaxUsers(void*, uint32_t* maxUsers) noexcept
 HRESULT AddAsync(void*, uint32_t options, XAsyncBlock* async) noexcept
 {
     SAKE_TRACE("options %#x", options);
-    return ::XAsyncBegin(async, nullptr, kAddIdentity, "XUserAddAsync",
-                         (options & kAddDefaultUserSilently) ? FailSilentAdd : FailInteractiveAdd);
+    if (options & kAddDefaultUserSilently)
+        return AskSakeToSignIn(async, kAddIdentity, "XUserAddAsync");
+    return ::XAsyncBegin(async, nullptr, kAddIdentity, "XUserAddAsync", FailInteractiveAdd);
 }
 
 HRESULT AddResult(void*, XAsyncBlock* async, XUserHandle* user) noexcept

@@ -96,6 +96,7 @@ struct LibraryWindow: View {
             if active { model.surveyImportSources() }
         }
         .task {
+            model.watchForSignIns()
             await model.check()
             // First run lands here with nothing built, so the wizard opens itself rather
             // than leaving an empty window and a button to find.

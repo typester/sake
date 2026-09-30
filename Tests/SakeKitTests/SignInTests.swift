@@ -401,10 +401,14 @@ private func events(_ stream: AsyncStream<SignInEvent>) async -> [SignInEvent] {
     return all
 }
 
-private func xboxSignIn(_ server: FakeServer, device: XboxDevice? = nil) -> XboxSignIn {
+private func xboxSignIn(
+    _ server: FakeServer,
+    relyingParties: [RelyingParty] = [RelyingParty("http://playfab.xboxlive.com/")],
+    device: XboxDevice? = nil
+) -> XboxSignIn {
     XboxSignIn(
         clientID: "0000000012345678",
-        relyingParties: ["http://playfab.xboxlive.com/"],
+        relyingParties: relyingParties,
         device: device,
         transport: server.transport,
         sleep: { _ in },
@@ -433,28 +437,37 @@ private func xboxSignIn(_ server: FakeServer, device: XboxDevice? = nil) -> Xbox
     #expect(!server.requests.contains { $0.url?.host() == "device.auth.xboxlive.com" })
 }
 
-@Test func aRefreshTokenSignsInAgainWithoutACodeAndADeviceBindsEveryToken() async throws {
+@Test func aRefreshTokenSignsInAgainWithoutACodeAndTheDeviceBindsOnlyWhatWantsIt() async throws {
     let server = FakeServer([
-        (200, tokenAnswer), (200, userAnswer), (200, deviceAnswer), (200, xstsAnswer), (200, playfabAnswer),
+        (200, tokenAnswer), (200, userAnswer), (200, userAnswer), (200, deviceAnswer),
+        (200, xstsAnswer), (200, playfabAnswer),
     ])
     let device = XboxDevice(key: ProofKey(), id: UUID())
 
-    let all = await events(xboxSignIn(server, device: device).run(refreshToken: "an-old-refresh-token"))
+    let signIn = xboxSignIn(server, relyingParties: [.playFab], device: device)
+    let all = await events(signIn.run(refreshToken: "an-old-refresh-token"))
 
     guard all.count == 2, case .signedIn(let result) = all[0] else {
         Issue.record("the sign-in went \(all)")
         return
     }
     #expect(result.refreshToken == "the-refresh-token")
-    for request in server.requests.dropFirst() {
-        #expect(try signatureHolds(request, path: request.url!.path(), key: device.key))
-    }
+
+    let users = server.requests.filter { $0.url?.host() == "user.auth.xboxlive.com" }
+    #expect(users.count == 2)
+    #expect(users.first?.value(forHTTPHeaderField: "Signature") == nil)
+    #expect(try signatureHolds(try #require(users.last), path: "/user/authenticate", key: device.key))
+
     let xsts = server.requests.filter { $0.url?.host() == "xsts.auth.xboxlive.com" }
-    #expect(xsts.count == 2)
-    for request in xsts {
-        let properties = try #require(try json(request)["Properties"] as? [String: Any])
-        #expect(properties["DeviceToken"] as? String == "the-device-token")
-    }
+    #expect(try xsts.map { try json($0)["RelyingParty"] as? String } == [
+        "http://xboxlive.com", "http://playfab.xboxlive.com/",
+    ])
+    let identity = try #require(try json(xsts[0])["Properties"] as? [String: Any])
+    #expect(identity["DeviceToken"] == nil)
+    #expect(xsts[0].value(forHTTPHeaderField: "Signature") == nil)
+    let playFab = try #require(try json(xsts[1])["Properties"] as? [String: Any])
+    #expect(playFab["DeviceToken"] as? String == "the-device-token")
+    #expect(try signatureHolds(xsts[1], path: "/xsts/authorize", key: device.key))
 }
 
 @Test func aRefreshTokenMicrosoftRefusesFallsBackToACode() async throws {
@@ -483,4 +496,184 @@ private func xboxSignIn(_ server: FakeServer, device: XboxDevice? = nil) -> Xbox
     }
     #expect(reason.contains("Child not in Family"))
     #expect(all[1] == .finished)
+}
+
+// MARK: - Answering a title's runtime
+
+private func temporaryPaths() -> Paths {
+    let root = FileManager.default.temporaryDirectory.appending(path: "sake-sign-in-\(UUID().uuidString)")
+    return Paths(root: root.appending(path: "support"), cache: root.appending(path: "cache"))
+}
+
+private func remove(_ paths: Paths) {
+    try? FileManager.default.removeItem(at: paths.root.deletingLastPathComponent())
+}
+
+/// A bottle with a GDK title installed and its runtime's request waiting in the mailbox.
+private func titleAsking(in paths: Paths, titleID: String = "12AB34CD") throws -> GDKMailbox.Request {
+    let bottle = Bottle(paths: paths, name: "gdk")
+    let game = bottle.driveC.appending(path: "Program Files/Example")
+    try FileManager.default.createDirectory(at: game, withIntermediateDirectories: true)
+    try Data("""
+        <Game><ShellVisuals DefaultDisplayName="Example Game" /><TitleId>12AB34CD</TitleId>\
+        <MSAAppId>0000000012345678</MSAAppId></Game>
+        """.utf8).write(to: game.appending(path: GDKTitle.configName))
+
+    let folder = GDKMailbox(bottle: bottle).directory.appending(path: titleID)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let id = "{\(UUID().uuidString)}"
+    try Data("sake 1\nrequest \(id)\n".utf8).write(to: folder.appending(path: "request"))
+    return GDKMailbox.Request(bottle: "gdk", titleID: titleID, id: id)
+}
+
+private func mailboxFile(_ name: String, _ request: GDKMailbox.Request, in paths: Paths) -> URL {
+    GDKMailbox(bottle: Bottle(paths: paths, name: request.bottle)).directory
+        .appending(path: "\(request.titleID)/\(name)")
+}
+
+private func answer(to request: GDKMailbox.Request, in paths: Paths) -> [String: String]? {
+    GDKMailbox.read(mailboxFile("answer", request, in: paths))
+}
+
+private func events(_ stream: AsyncStream<GDKSignInEvent>) async -> [GDKSignInEvent] {
+    var all: [GDKSignInEvent] = []
+    for await event in stream { all.append(event) }
+    return all
+}
+
+private func gdkSignIn(_ request: GDKMailbox.Request, _ paths: Paths, _ server: FakeServer) -> GDKSignIn {
+    GDKSignIn(request: request, paths: paths, transport: server.transport, sleep: { _ in }, now: { now })
+}
+
+private func permissions(of url: URL) throws -> Int? {
+    try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int
+}
+
+@Test func aTitlesFirstRequestShowsACodeAndIsAnsweredWithASession() async throws {
+    let paths = temporaryPaths()
+    defer { remove(paths) }
+    let request = try titleAsking(in: paths)
+    let server = FakeServer([
+        (200, codeAnswer), (200, tokenAnswer), (200, userAnswer), (200, userAnswer), (200, deviceAnswer),
+        (200, xstsAnswer), (200, playfabAnswer),
+    ])
+
+    let all = await events(gdkSignIn(request, paths, server).run())
+
+    guard all.count == 3, case .code(let code, let title) = all[0] else {
+        Issue.record("the sign-in went \(all)")
+        return
+    }
+    #expect(code.userCode == "ABCD1234")
+    #expect(title == "Example Game")
+    #expect(Array(all.dropFirst()) == [.signedIn(title: "Example Game"), .finished])
+    #expect(form(try #require(server.requests.first))["client_id"] == "0000000012345678")
+
+    #expect(answer(to: request, in: paths) == ["request": request.id, "state": "signed-in"])
+    #expect(!FileManager.default.fileExists(atPath: mailboxFile("request", request, in: paths).path))
+    let session = mailboxFile("session", request, in: paths)
+    let lines = try String(contentsOf: session, encoding: .utf8).split(separator: "\n").map(String.init)
+    #expect(lines.contains("xuid 2814630418365389"))
+    #expect(lines.contains { $0.hasPrefix("token http://playfab.xboxlive.com/ ") && $0.hasSuffix(" the-playfab-token") })
+    #expect(try permissions(of: session) == 0o600)
+
+    let kept = try #require(XboxAccounts(paths: paths).account(for: "0000000012345678"))
+    #expect(kept.refreshToken == "the-refresh-token")
+    let device = try #require(server.requests.first { $0.url?.host() == "device.auth.xboxlive.com" })
+    #expect(try (json(device)["Properties"] as? [String: Any])?["Id"] as? String == "{\(kept.deviceID.uuidString)}")
+    #expect(try permissions(of: paths.signIns) == 0o700)
+    #expect(try permissions(of: paths.signIns.appending(path: "0000000012345678.json")) == 0o600)
+}
+
+@Test func aKeptSignInAnswersWithoutACodeAndKeepsItsDevice() async throws {
+    let paths = temporaryPaths()
+    defer { remove(paths) }
+    let request = try titleAsking(in: paths)
+    let device = XboxDevice(key: ProofKey(), id: UUID())
+    try XboxAccounts(paths: paths).save(
+        XboxAccount(refreshToken: "an-old-refresh-token", device: device), for: "0000000012345678"
+    )
+    let server = FakeServer([
+        (200, tokenAnswer), (200, userAnswer), (200, userAnswer), (200, deviceAnswer),
+        (200, xstsAnswer), (200, playfabAnswer),
+    ])
+
+    let all = await events(gdkSignIn(request, paths, server).run())
+
+    #expect(all == [.signedIn(title: "Example Game"), .finished])
+    #expect(form(try #require(server.requests.first))["refresh_token"] == "an-old-refresh-token")
+    let xsts = try #require(server.requests.last)
+    #expect(try signatureHolds(xsts, path: "/xsts/authorize", key: device.key))
+    let kept = try #require(XboxAccounts(paths: paths).account(for: "0000000012345678"))
+    #expect(kept.refreshToken == "the-refresh-token")
+    #expect(kept.deviceID == device.id)
+    #expect(kept.deviceKey == device.key.rawRepresentation)
+}
+
+@Test func aRequestForATitleTheBottleDoesNotHaveIsRefused() async throws {
+    let paths = temporaryPaths()
+    defer { remove(paths) }
+    let request = try titleAsking(in: paths, titleID: "0BADF00D")
+    let server = FakeServer([])
+
+    let all = await events(gdkSignIn(request, paths, server).run())
+
+    guard all.count == 2, case .failed(let reason, nil) = all[0] else {
+        Issue.record("the sign-in went \(all)")
+        return
+    }
+    #expect(reason.contains("0BADF00D"))
+    #expect(answer(to: request, in: paths)?["state"] == "failed")
+    #expect(server.requests.isEmpty)
+    #expect(!FileManager.default.fileExists(atPath: mailboxFile("request", request, in: paths).path))
+}
+
+@Test func aSignInXboxLiveRefusesIsAnsweredWithItsReason() async throws {
+    let paths = temporaryPaths()
+    defer { remove(paths) }
+    let request = try titleAsking(in: paths)
+    try XboxAccounts(paths: paths).save(
+        XboxAccount(refreshToken: "a-refresh-token", device: XboxDevice(key: ProofKey(), id: UUID())),
+        for: "0000000012345678"
+    )
+    let server = FakeServer([
+        (200, tokenAnswer), (200, userAnswer), (200, userAnswer), (200, deviceAnswer),
+        (401, #"{"XErr":2148916238}"#),
+    ])
+
+    let all = await events(gdkSignIn(request, paths, server).run())
+
+    guard all.count == 2, case .failed(let reason, "Example Game") = all[0] else {
+        Issue.record("the sign-in went \(all)")
+        return
+    }
+    #expect(reason.contains("Child not in Family"))
+    let answered = try #require(answer(to: request, in: paths))
+    #expect(answered["state"] == "failed")
+    #expect(answered["reason"]?.contains("Child not in Family") == true)
+    #expect(!FileManager.default.fileExists(atPath: mailboxFile("session", request, in: paths).path))
+}
+
+@Test func aSignInNobodyReadsAnyMoreIsAnsweredCancelled() async throws {
+    let paths = temporaryPaths()
+    defer { remove(paths) }
+    let request = try titleAsking(in: paths)
+    let server = FakeServer([(200, codeAnswer)])
+    let signIn = GDKSignIn(
+        request: request, paths: paths, transport: server.transport,
+        sleep: { _ in try await Task.sleep(for: .seconds(60)) }, now: { now }
+    )
+
+    let reading = Task { await events(signIn.run()) }
+    while server.requests.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
+    #expect(answer(to: request, in: paths)?["state"] == "waiting")
+    reading.cancel()
+    _ = await reading.value
+
+    let deadline = Date().addingTimeInterval(5)
+    while answer(to: request, in: paths)?["state"] == "waiting", Date() < deadline {
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(answer(to: request, in: paths) == ["request": request.id, "state": "cancelled"])
+    #expect(!FileManager.default.fileExists(atPath: mailboxFile("request", request, in: paths).path))
 }

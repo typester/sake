@@ -25,6 +25,10 @@ public struct Paths: Sendable, Equatable {
     public var engine: URL { root.appending(path: "engine") }
     public var bottles: URL { root.appending(path: "bottles") }
 
+    /// What signs a person in to Xbox Live again without a code. Not in the Keychain while
+    /// sake is signed ad hoc, and never in a bottle. See docs/gdk.md.
+    public var signIns: URL { root.appending(path: "sign-ins") }
+
     /// One bottle is one `WINEPREFIX`, with the games inside it in `drive_c`.
     public func bottle(named name: String) -> URL { bottles.appending(path: name) }
 

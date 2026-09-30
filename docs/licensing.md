@@ -110,7 +110,8 @@ happy would hide the one thing about it that has to be visible.
 
 For titles built on Microsoft's GDK, sake provides its own stand-in for the Gaming Runtime
 (`gdk.md`). It never ships, downloads or copies Microsoft's GDK or Gaming Services, and it
-takes nothing from the community stand-in, whose repository has no licence. Its task queue
+takes no code or text from the community stand-in, whose repository has no licence: what the
+stand-in's log and README record of its behaviour is used as a record and nothing more. Its task queue
 and `XAsync` are libHttpClient's, which is Microsoft's and MIT-licensed: fetched at a pinned
 commit rather than kept in this repository, and contained in any DLL built from it, so
 libHttpClient's licence goes wherever that DLL goes. From WineGDK it takes facts and no text:
@@ -120,7 +121,8 @@ to be libHttpClient's, under an LGPL header there (`gdk.md`). Signing in uses th
 `MSAAppId` from its `MicrosoftGame.config`; sake signs in as no other application, and every
 request made while finding out how used that ID alone. Its requests are the shapes Microsoft's
 documentation gives where it gives them and otherwise what the services accepted
-(`gdk.md`); none comes from the stand-in or from Xodus.
+(`gdk.md`); none comes from the stand-in or from Xodus. Which token is bound to a device
+follows the stand-in's README, which says PlayFab needs one.
 
 ## Why D3DMetal cannot simply be avoided
 

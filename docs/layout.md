@@ -16,6 +16,12 @@ those were measured in sake.
                                              is 1 GB, and a cloned game adds nothing
     bottles/<name>/sake-titles.json          what was added to the library by hand, if
                                              anything — see below
+    bottles/<name>/drive_c/users/crossover/AppData/Local/Sake/<title ID>/
+                                             where a GDK title's runtime asks sake for its
+                                             user, and the session sake answers with —
+                                             see gdk.md
+    sign-ins/<MSAAppId>.json                 what signs a person in to Xbox Live again,
+                                             readable by them alone — see gdk.md
 ~/Library/Caches/Sake/
     dl/ sources/ toolchain/ build/           downloads and build intermediates, ~4 GB
     d3dmetal/                                Apple's redist/lib, kept so that the image
@@ -34,6 +40,10 @@ Those two are not the whole of what sake leaves, which this section did not say 
 left `~/Library/HTTPStorages/dev.typester.sake` and `~/Library/Caches/dev.typester.sake`
 on 2026-09-20. Uninstalling does not take them yet. The sign-in uses a session that keeps
 nothing on disk, so it adds nothing there.
+
+What the sign-in keeps is inside `~/Library/Sake`, in `sign-ins/`, so uninstalling lists it
+on a line of its own and takes it to the Trash with the rest, refresh tokens and all, where
+emptying the Trash is what finally removes them. Added 2026-09-30.
 
 Run for real on 2026-09-19 against the tree described above, and put back afterwards:
 

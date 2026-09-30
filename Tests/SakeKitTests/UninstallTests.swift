@@ -160,3 +160,22 @@ private func collect(_ stream: AsyncStream<UninstallEvent>) async -> [UninstallE
     #expect(events.contains(.finished(removed: 1)))
     #expect((try? FileManager.default.contentsOfDirectory(atPath: can.path)) == ["support"])
 }
+
+@Test func aKeptSignInIsListedAndGoesWithTheRoot() async throws {
+    let (paths, container) = temporaryRoot()
+    defer { try? FileManager.default.removeItem(at: container) }
+    try makeTree(paths)
+    try XboxAccounts(paths: paths).save(
+        XboxAccount(refreshToken: "a-refresh-token", device: XboxDevice(key: ProofKey(), id: UUID())),
+        for: "0000000012345678"
+    )
+    let (can, injected) = trash(besides: paths, in: container)
+
+    #expect(Uninstaller(paths: paths).items().map(\.id) == ["engine", "bottle-default", "sign-ins", "cache"])
+    _ = await collect(Uninstaller(paths: paths).run(trash: injected))
+
+    #expect(!FileManager.default.fileExists(atPath: paths.signIns.path))
+    #expect(FileManager.default.fileExists(
+        atPath: can.appending(path: "support/sign-ins/0000000012345678.json").path
+    ))
+}

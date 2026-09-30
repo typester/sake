@@ -4,9 +4,10 @@ A title built on Microsoft's Game Development Kit (GDK) calls into `xgameruntime
 Gaming Runtime that Xbox Gaming Services installs on Windows, for its task queues, its user
 and its tokens. Wine has neither. This file is how sake means to provide both itself: a
 runtime DLL it builds, and a sign-in it performs. **The runtime exists, in `xgameruntime/`,
-and takes Minecraft Dungeons II as far as its sign-in. The sign-in exists in SakeKit and has
-signed a real account in; nothing calls it yet.** What was measured says so and gives the
-date; the rest is a decision or an open question.
+and asks sake to sign the person in; sake does, through files in the bottle, and the runtime
+does not hand the user to the game yet. It asks at the wrong moment, before the game's
+window is up (below).** What was measured says so and gives the date; the rest is a
+decision or an open question.
 
 ## What was measured
 
@@ -139,6 +140,59 @@ shape it is named, and everything else is here because the service accepted it.
 - **Finding the title.** `GDKTitle` found Minecraft Dungeons II by its config in
   `steamapps/common`, five levels under `Program Files (x86)`, which is as deep as it looks.
 
+Before anything kept the refresh token, the Keychain was measured, the same night, with a
+throwaway app signed the way `scripts/build-app.sh` signs sake: ad hoc. Three builds of it
+differed in one constant, and so in their code directory hash alone.
+
+- **A build that did not make an item is asked for the login password to read it.** The
+  build that added a generic password read it back with no dialog. The next build's read
+  brought SecurityAgent's "wants to use your confidential information … To allow this, enter
+  the “login” keychain password", with Always Allow, Deny and Allow.
+- **Always Allow does not stick.** With the password entered and Always Allow pressed, that
+  same build was asked again on its next read. The item's access list still named only the
+  build that made it; what had grown was its partition list, by the second build's `cdhash:`.
+  Under an ad hoc signature, then, sake would be asked every time it read.
+- **The dialog outlives the process that asked, and takes the keyboard.** Ending the process
+  left the dialog up, and it answered the next request from the same app. Keys typed
+  elsewhere while it was up went into its password field.
+- **Two things asked nothing**: a query for attributes alone from a build the item did not
+  trust, and deleting the item from the build that made it. The Data Protection Keychain
+  refused the app outright, `-34018`, "A required entitlement is not present".
+
+So the refresh token is in a file (the design, below).
+
+On 2026-09-30 the runtime asked sake to sign in, first from a probe in the `ex` bottle and
+then from the game, with sake's runtime in `system32` and the stand-in's three copies set
+aside for the game's runs.
+
+- **The probe** loaded the runtime by its path, beside a copy of the game's
+  `MicrosoftGame.config`, and asked the way a title may: the silent `XUserAddAsync`, then
+  `XTaskQueueTerminate` on the call's queue at once, then dispatching its completion port
+  until the termination landed. With no sake to answer, the runtime gave up after 10.1
+  seconds and completed the call. With sake running, sake picked the request up after a
+  second and showed its panel, and Cancel there came back as `cancelled`. Both times the
+  call completed on a queue already terminating, nothing was refused, and the termination
+  finished.
+- **The game, with no sign-in kept.** The silent add came 2.7 seconds after the launcher
+  loaded the runtime, before the game had a window. sake picked the request up 3.5 seconds
+  later, most of it spent walking the bottle's `Program Files` for the title, so sake now
+  says `waiting` before it looks. It showed the code, the browser opened at
+  `microsoft.com/link`, the owner signed in there, and 2 minutes 24 seconds after the pickup
+  sake wrote a session holding a token for each of the three relying parties. Only then did
+  the add return, and only then did the game open its window, on its title scene and
+  "SIGNING IN ..". While the add was pending the game called `XAsyncGetStatus` without
+  waiting and dispatched the completion port with no timeout, 4.19 million times in two
+  minutes, and made no other call. It terminated the add's queue after it had seen the call
+  complete.
+- **The game again, with the sign-in kept.** sake answered 2.5 seconds after the request, 1.0
+  of them to pick it up, with no panel, and the kept refresh token was replaced by the new
+  one Microsoft handed back.
+- **So the silent add is the wrong place to ask.** The sign-in has to start once the game is
+  showing its own screen, which is where the stand-in starts it: at the first token request
+  (above). Until 2026-09-30 this file proposed holding the silent add instead, on the belief
+  that the game would already be showing "SIGNING IN .." while it waited. It had not drawn
+  anything yet.
+
 ## WineGDK
 
 `Weather-OS/WineGDK` implements `xgameruntime` inside Wine 11.14. Its author declares their
@@ -174,18 +228,38 @@ have taken Microsoft's code at second hand under a header that is not its own.
 
 **A sign-in in the app, started by the game.** It looks like the stand-in's (above): the
 person signs in when the game does, in the browser, rather than before it starts. The runtime
-asks sake; sake opens `microsoft.com/link` and shows the code to type there, since there is
-no window without one (above). The device-code flow uses the title's own `MSAAppId`, sake
-keeps the refresh token in the Keychain, and XSTS tokens are minted for each relying party the
-title needs. The title declares that ID for exactly this; sake signs in as no other
-application. `XboxSignIn` in SakeKit is the sign-in from a refresh token or a code to the
-tokens; the runtime's request and sake's answer to it are not built. This paragraph used to
-show the code in sake's window before the game started, and kept the device's proof key in
-the Keychain as well; whether there is a key at all is now an open question.
+asks sake at the game's first token request; sake opens `microsoft.com/link` and shows the
+code to type there, in a panel of its own that floats above the browser, since there is no
+sign-in without a code (above). The device-code flow uses the title's own `MSAAppId`; the
+title declares that ID for exactly this, and sake signs in as no other application. XSTS
+tokens are minted for `http://xboxlive.com`, for `http://playfab.xboxlive.com/`, and for
+whatever a table sake keeps names for the title, which for Minecraft Dungeons II is
+`rp://api.minecraftservices.com/`. Only PlayFab's is bound to a device, because the
+stand-in's README says PlayFab will not link an account otherwise; the rest are bound to
+nothing, and the device's key never leaves sake. The runtime asks at the silent add today,
+which is the wrong place (above), and the third step of the order moves it.
 
-**A session file between them.** sake writes into the bottle the user's XUID, gamertag and the
-title's XSTS tokens with their expiry, and the runtime reads it. The refresh token stays out
-of the bottle. Whether a key has to go in is open, below.
+**What sake keeps.** The refresh token and the device, in `~/Library/Sake/sign-ins`, one file
+per app ID, readable by the person alone: not the Keychain, which asks for the login password
+on every read under an ad hoc signature (above). A file costs this: any program the person
+runs can read it, every Windows program in every bottle included, through `Z:`. With it,
+someone can sign in to Xbox Live as the person, with this title's app ID, until it is
+revoked; changing the account's password should do that, and has not been tried. Nothing
+measured says whether it reaches anything beyond Xbox Live. With a Developer ID signature
+the Keychain may stop asking, which is not measured either.
+
+**Files between them.** In `%LOCALAPPDATA%\Sake\<title ID>\` in the bottle, which from sake's
+side is `drive_c/users/crossover/AppData/Local/Sake/`, since every sake bottle's Windows user
+is `crossover`. The runtime writes `request`, holding an ID of its own; sake writes `answer`
+and, once the person is signed in, `session`. Each file is `key value` lines under a first
+line of `sake 1`, and each is written whole and renamed into place. `answer` says `waiting`
+as soon as sake has the request, then `signed-in`, `failed` with a reason, or `cancelled`.
+`session` carries the XUID, gamertag, user hash, age group and privileges, and a line `token
+<relying party> <expiry in Unix seconds> <token>` for each relying party. The runtime gives
+up when nothing says `waiting` within 10 seconds, and waits 20 minutes at most for the rest,
+a device code lasting 15. Files, because a Windows DLL cannot reach a socket sake listens on:
+Wine's Winsock converts no `AF_UNIX` address (CrossOver 26.3.0's sources, read 2026-09-29).
+The refresh token stays out of the bottle.
 
 ## Open questions
 
@@ -195,21 +269,26 @@ of the bottle. Whether a key has to go in is open, below.
   for that title, which for Minecraft Dungeons II is `api.minecraftservices.com` →
   `rp://api.minecraftservices.com/`. Whether that is what the game's own calls need, the first
   run with a signed-in user will show.
-- **Which call starts the sign-in.** The runtime can hold the silent `XUserAddAsync` until the
-  sign-in is done, so the game is handed the real user from the start, or pass it with a
-  placeholder the way the stand-in does and start at the first token request. The first is
-  the proposal.
+- ~~**Which call starts the sign-in.**~~ **Answered on 2026-09-30**, above: not the silent
+  `XUserAddAsync`, which holds the game's start until the sign-in is done, before the game
+  has a window; the first token request, the way the stand-in does it, with the silent add
+  returning at once.
 - **Whether a key goes into the bottle.** Microsoft's page says every call to an Xbox service
   carries a signature from the key its token is bound to. A token bound to nothing needed none
   at the two services measured; if the ones the game calls agree, the runtime is handed
   unbound tokens and no key leaves sake. If one does not, the key can be one made for that
-  launch rather than one kept.
+  launch rather than one kept. The stand-in's log points the first way: none of the 416
+  requests whose headers it recorded carried a `Signature`, and the game reached character
+  select. sake binds PlayFab's token alone and keeps the key; the third step shows whether
+  the game's services agree.
 - **Whether tokens outlive a session.** XSTS tokens last 16 hours and the user token 96; a
-  session longer than that, or a Mac asleep through it, needs a way for the runtime to ask
-  sake for fresh ones instead of a file written at launch.
-- **The Keychain under ad-hoc signing.** A login-keychain item trusts the signature of the app
-  that made it, and an ad-hoc signature changes with every build, so each update may ask the
-  person to allow sake again. Not yet measured.
+  session longer than that, or a Mac asleep through it, needs the runtime to ask sake for
+  fresh ones. It can ask again through the same files; when it should is the third step's.
+- ~~**The Keychain under ad-hoc signing.**~~ **Answered on 2026-09-29**, above: it asks for
+  the login password on every read, Always Allow or not, so what sake keeps is a file.
+- **sake has to be running.** A request that nobody picks up fails after 10 seconds, and the
+  game goes on without a user. A sake quit while its game runs cannot answer; whether
+  quitting should be refused, or warned about, while a title runs is open.
 - ~~**The interface layout.**~~ **Answered for Minecraft Dungeons II on 2026-09-29**, above:
   every version it names is one WineGDK lists. A title built with a later edition may name
   another; the runtime refuses a version it does not know and logs it, which is where to
@@ -230,12 +309,14 @@ of the bottle. Whether a key has to go in is open, below.
 1. **The runtime alone**: built, placed, and the game started with no stand-in, as far as its
    sign-in. The interface layout is the largest unknown, so it goes first. **Done on
    2026-09-29**, built and placed by hand (above).
-2. **The sign-in in SakeKit**, measured against the relying parties above. **The sign-in
-   itself is done, on 2026-09-29**: `XboxSignIn` goes from a refresh token or a code to the
-   tokens, against the real services. Still to come in this step: the runtime asking sake to
-   sign in, sake opening the browser and showing the code, and the refresh token in the
-   Keychain.
-3. **`XUser` over the session file**, to character select.
+2. **The sign-in in SakeKit**, measured against the relying parties above. **Done on
+   2026-09-30**: `XboxSignIn` goes from a refresh token or a code to the tokens, the runtime
+   asks sake through the bottle, sake shows the code and opens the browser, and the sign-in
+   is kept in `~/Library/Sake/sign-ins`. The runtime asks at the silent add, which the next
+   step moves.
+3. **`XUser` over the session file**, to character select. The silent add returns at once,
+   with the person when the session in the bottle is still good and with a placeholder the
+   way the stand-in does when it is not, and the sign-in starts at the first token request.
 4. **SakeKit builds and places the runtime**: `xgameruntime/` compiled with the engine's
    toolchain, libHttpClient fetched as a pinned source, and the DLL put in the `system32` of a
    bottle whose title has a `MicrosoftGame.config`. Last, because the steps before it need

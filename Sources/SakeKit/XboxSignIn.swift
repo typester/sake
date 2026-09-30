@@ -32,24 +32,43 @@ public struct XboxDevice: Sendable {
     }
 }
 
+/// A service a sign-in asks Xbox Live for a token to, named exactly as the endpoint table
+/// names it.
+public struct RelyingParty: Sendable, Hashable {
+    public let name: String
+    /// Minted with the device's own token and bound to its key. A service that checks
+    /// signatures then refuses the token on any request the key did not sign, and a title's
+    /// runtime has no key, so only a service that wants a device gets one. See docs/gdk.md.
+    public let boundToDevice: Bool
+
+    public init(_ name: String, boundToDevice: Bool = false) {
+        self.name = name
+        self.boundToDevice = boundToDevice
+    }
+
+    /// The one whose token names the person, and which every sign-in asks for.
+    public static let identity = RelyingParty("http://xboxlive.com")
+
+    /// The community stand-in's README says PlayFab refuses to link an account whose token
+    /// came without a device, and the stand-in's is the one sign-in known to reach the game.
+    public static let playFab = RelyingParty("http://playfab.xboxlive.com/", boundToDevice: true)
+}
+
 /// One sign-in from start to finish: a refresh token if there is one that still works,
 /// Microsoft's device code if not, then Xbox Live's tokens for each relying party.
 ///
-/// With no ``XboxDevice`` the tokens are bound to nothing and nothing is signed, which is
-/// the flow Microsoft documents for websites. Which of the two a title's runtime is handed
-/// is docs/gdk.md's to say.
+/// A token bound to nothing needs nothing signed, which is the flow Microsoft documents for
+/// websites. Only a ``RelyingParty`` that is `boundToDevice` gets the ``XboxDevice``, and
+/// with no device it is bound to nothing like the rest.
 public struct XboxSignIn: Sendable {
     private let microsoft: MicrosoftSignIn
     private let xbox: XboxLiveAuth
-    private let relyingParties: [String]
+    private let relyingParties: [RelyingParty]
     private let device: XboxDevice?
-
-    /// The relying party whose token names the person, and which every sign-in asks for.
-    public static let identity = "http://xboxlive.com"
 
     public init(
         clientID: String,
-        relyingParties: [String],
+        relyingParties: [RelyingParty],
         device: XboxDevice? = nil,
         transport: HTTPTransport = .ephemeral(),
         sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
@@ -57,7 +76,7 @@ public struct XboxSignIn: Sendable {
     ) {
         microsoft = MicrosoftSignIn(clientID: clientID, transport: transport, sleep: sleep, now: now)
         xbox = XboxLiveAuth(transport: transport, now: now)
-        self.relyingParties = [Self.identity] + relyingParties.filter { $0 != Self.identity }
+        self.relyingParties = [.identity] + relyingParties.filter { $0.name != RelyingParty.identity.name }
         self.device = device
     }
 
@@ -98,21 +117,33 @@ public struct XboxSignIn: Sendable {
         return try await microsoft.waitForApproval(of: code)
     }
 
+    /// A bound token has to come from a user token bound to the same key, so a sign-in that
+    /// mints both kinds asks for two user tokens.
     private func xboxSession(accessToken: String) async throws -> XboxSession {
-        let key = device?.key
-        let user = try await xbox.userToken(accessToken: accessToken, key: key)
-        var deviceToken: XboxToken?
-        if let device {
-            deviceToken = try await xbox.deviceToken(key: device.key, deviceID: device.id)
+        let user = try await xbox.userToken(accessToken: accessToken, key: nil)
+        var bound: (device: XboxDevice, user: XboxToken, token: XboxToken)?
+        if let device, relyingParties.contains(where: \.boundToDevice) {
+            bound = (
+                device,
+                try await xbox.userToken(accessToken: accessToken, key: device.key),
+                try await xbox.deviceToken(key: device.key, deviceID: device.id)
+            )
         }
 
         var tokens: [String: XboxToken] = [:]
         for relyingParty in relyingParties {
-            tokens[relyingParty] = try await xbox.xstsToken(
-                relyingParty: relyingParty, userToken: user, deviceToken: deviceToken, key: key
-            )
+            if relyingParty.boundToDevice, let bound {
+                tokens[relyingParty.name] = try await xbox.xstsToken(
+                    relyingParty: relyingParty.name, userToken: bound.user, deviceToken: bound.token,
+                    key: bound.device.key
+                )
+            } else {
+                tokens[relyingParty.name] = try await xbox.xstsToken(
+                    relyingParty: relyingParty.name, userToken: user, key: nil
+                )
+            }
         }
-        guard let person = tokens[Self.identity]?.user, person.xuid != nil else {
+        guard let person = tokens[RelyingParty.identity.name]?.user, person.xuid != nil else {
             throw XboxLiveError.anonymous
         }
         return XboxSession(user: person, tokens: tokens)

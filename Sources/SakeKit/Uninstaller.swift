@@ -38,6 +38,7 @@ public struct Uninstaller: Sendable {
         found += Bottle.all(in: paths).map {
             Item(id: "bottle-\($0.name)", name: "Bottle “\($0.name)”", url: $0.url)
         }
+        found.append(Item(id: "sign-ins", name: "Xbox sign-ins", url: paths.signIns))
         found.append(
             Item(id: "cache", name: "Downloads and build files", url: paths.cache)
         )
