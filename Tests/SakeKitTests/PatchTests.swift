@@ -139,7 +139,7 @@ private func read(_ tree: URL) throws -> String {
     try String(contentsOf: tree.appending(path: "dlls/ntdll/unix/loader.c"), encoding: .utf8)
 }
 
-@Test func theRepositoryCarriesTheSixPatchesAndSaysTheyAreNotMIT() throws {
+@Test func theRepositoryCarriesTheEightPatchesAndSaysTheyAreNotMIT() throws {
     let patcher = WinePatcher(directory: repositoryPatches)
     let patches = try patcher.patches()
 
@@ -150,13 +150,16 @@ private func read(_ tree: URL) throws -> String {
         "0004-winemac-cross-process-MetalViewSwapChain-via-CALayerHost.patch",
         "0005-winemac-cross-process-child-window-swapchains.patch",
         "0006-winemac-give-D3DMetal-a-hosted-swapchain-for-a-window-it-does-not-own.patch",
+        "0007-winhttp-stub-WINHTTP_OPTION_DECOMPRESSION.patch",
+        "0008-winhttp-stub-WINHTTP_OPTION_IPV6_FAST_FALLBACK.patch",
     ])
     // Each one says what it does on its first line, which is where the reasoning starts,
     // and names the module it changes the way a Wine commit does.
     for patch in patches {
         let subject = patch.subject
         #expect(
-            subject.hasPrefix("ntdll: ") || subject.hasPrefix("winemac: "),
+            subject.hasPrefix("ntdll: ") || subject.hasPrefix("winemac: ")
+                || subject.hasPrefix("winhttp: "),
             "\(patch.id): \(subject)"
         )
     }
@@ -168,7 +171,7 @@ private func read(_ tree: URL) throws -> String {
     #expect(licence.contains("Version 2.1"))
 }
 
-@Test func nothingOutsideNtdllAndTheMacDriverIsPatched() throws {
+@Test func nothingOutsideNtdllTheMacDriverAndWinHTTPIsPatched() throws {
     for patch in try WinePatcher(directory: repositoryPatches).patches() {
         let targets = patch.targets
 
@@ -176,9 +179,11 @@ private func read(_ tree: URL) throws -> String {
         for target in targets {
             // Widened from ntdll alone on 2026-09-20, as a decision: Steam's client draws
             // in one process and owns its window in another, and the driver that has to
-            // carry that across is winemac.drv. docs/runtime.md has the measurement.
+            // carry that across is winemac.drv. Widened to winhttp on 2026-09-29 for two
+            // upstream stubs XCurl cannot do without. docs/runtime.md has both measurements.
             #expect(
-                target.hasPrefix("dlls/ntdll/") || target.hasPrefix("dlls/winemac.drv/"),
+                target.hasPrefix("dlls/ntdll/") || target.hasPrefix("dlls/winemac.drv/")
+                    || target.hasPrefix("dlls/winhttp/"),
                 "\(patch.id) reaches \(target)"
             )
         }

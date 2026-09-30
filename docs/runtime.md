@@ -207,11 +207,12 @@ and the renderer that draws it was still alive seventy-five seconds later.
 
 ## Two patches to ntdll
 
-sake carries six patches in `patches/`, all LGPL-2.1-or-later because all are derivatives of
-Wine. The two in ntdll are this section's; they came from the prototype unchanged and go in
-before configure. The four in winemac.drv arrived with Steam on 2026-09-20 and are in the
-Steam section below. The build side of patching is in `wine-build.md` and the licence side in
-`licensing.md`.
+sake carries eight patches in `patches/`, all LGPL-2.1-or-later because all are derivatives
+of Wine. The two in ntdll are this section's; they came from the prototype unchanged and go
+in before configure. The four in winemac.drv arrived with Steam on 2026-09-20 and are in the
+Steam section below, and the two in winhttp arrived with Minecraft Dungeons II on 2026-09-29
+and are in the GDK section after it. The build side of patching is in `wine-build.md` and
+the licence side in `licensing.md`.
 
 **sake measured both on 2026-09-19**, against its own engine and bottle, the day it started
 carrying them. The prototype's numbers are kept beside sake's because they are the
@@ -433,6 +434,49 @@ owns under a root it does not, and nothing hosts that shape yet.
 came up, and Stardew Valley installed through it and played. Reported by the owner, not
 instrumented: nothing traced that run, and the measurements above all stop at the sign-in
 form. 2026-09-20.
+
+## GDK titles: XCurl drops a request when WinHTTP refuses an option
+
+Measured in sake on 2026-09-29 in the `ex` bottle, with Minecraft Dungeons II started through
+Steam. The title is built on Microsoft's GDK and needs Xbox Gaming Services, which Wine does
+not have, so a community stand-in DLL was in its place throughout. The GDK's HTTP client,
+XCurl, runs over WinHTTP.
+
+**Two of the options XCurl sets do not exist in Wine 11.0.** The options at the eleven
+`WinHttpSetOption` call sites in `XCurl.dll`, read with the engine toolchain's
+`llvm-objdump`, were set one at a time from a small exe against CrossOver 26.3.0's WinHTTP,
+with no request sent. Two fail, both with `ERROR_WINHTTP_INVALID_OPTION` (12009), because
+`session.c` has no case for either: `WINHTTP_OPTION_IPV6_FAST_FALLBACK` (140), set on the
+session, and `WINHTTP_OPTION_DECOMPRESSION` (118), set on each request as soon as it is
+opened.
+
+**A refusal ends the request before it is sent.** For 118, XCurl reads the error and
+abandons the request, so `LoginWithSteam` never reaches PlayFab and the game shows LOG IN
+FAILED, error 0063. Refusing 140 alone does the same: with the stand-in's own answer to it
+removed and 118 still answered, the game showed the same error, and the stand-in logged 140
+refused 25 times and not one connection made.
+
+**Upstream stubbed both, and sake carries the two commits** until CrossOver's sources contain
+them: `patches/0007` is Paul Gofman's for 118, from wine-11.4, and `patches/0008` is Hans
+Leidekker's for 140, from wine-11.7. Each accepts the option, prints a `FIXME` and does
+nothing else. For 118 that is enough, because the `Accept-Encoding` header is WinHTTP's to
+add -- `XCurl.dll` holds no such string, in ASCII or UTF-16 -- so nothing asks the server to
+compress. wine-11.5 replaced the 118 stub with real gzip and deflate support, which sake
+does not carry.
+
+**How to tell it worked.** The same exe on the patched engine gets `TRUE` for both, and with
+`WINEDEBUG` at its default prints the two lines below, where the unpatched engine printed
+`unimplemented option 140` and `unimplemented option 118`:
+
+```
+fixme:winhttp:session_set_option WINHTTP_OPTION_IPV6_FAST_FALLBACK: 1
+fixme:winhttp:set_option WINHTTP_OPTION_DECOMPRESSION, 0x3 stub.
+```
+
+sake starts titles with `WINEDEBUG=-all`, so a title's log never shows them; the tell in the
+game is the sign-in going through with both of the stand-in's hooks removed, which it did on
+the rebuilt engine: Microsoft's sign-in, then `LoginWithSteam`, then character select, with
+every reply the stand-in logged, 20 of them, a 200 and no option refused.
 
 ## Killing wineserver leaves the prefix's own services running
 

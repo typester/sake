@@ -58,13 +58,14 @@ Notes that cost time to find:
 
 ## The patches go in before configure
 
-`patches/` holds the changes sake makes to Wine's own code — six of them as of 2026-09-20,
-two in ntdll and four in winemac.drv, all LGPL-2.1-or-later rather than this repository's
-MIT. Two of the four are upstream Wine commits carried only until the CrossOver sources sake
-builds catch up with wine-11.11, one is the reference implementation attached to Wine bug
-60263, and the rest are sake's own; each file's header says which it is and where it came
-from. What each one is for, and how to tell that it worked, is in `runtime.md`; why they are
-a separate directory is in `licensing.md`.
+`patches/` holds the changes sake makes to Wine's own code — eight of them as of 2026-09-29,
+two in ntdll, four in winemac.drv and two in winhttp, all LGPL-2.1-or-later rather than this
+repository's MIT. Four are upstream Wine commits carried only until the CrossOver sources
+sake builds catch up — two of the winemac.drv ones with wine-11.11, the winhttp ones with
+wine-11.4 and wine-11.7 — one is the reference implementation attached to Wine bug 60263,
+and the rest are sake's own; each file's header says which it is and where it came from.
+What each one is for, and how to tell that it worked, is in `runtime.md`; why they are a
+separate directory is in `licensing.md`.
 
 They are applied to the unpacked source tree, which is the only copy sake has of it, so the
 build has one step that is not out of tree. Whether a patch is already in is asked of

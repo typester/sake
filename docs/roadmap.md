@@ -294,6 +294,7 @@ easier to read than it was interleaved with `configure` flags.
   cost a measurement on 2026-09-21: a row addressed by index was no longer the row it was.
 - **Where the CrossOver version lives.** It is a knob users may need — a newer CrossOver may
   fix or break a given game — but exposing it invites them to pick a combination nobody has
-  run. Steam gave the knob a concrete reason on 2026-09-20: two of sake's patches are
-  upstream Wine commits that CrossOver's next Wine rebase will contain, and the day the
-  tarball sake builds is based on wine-11.11 or later they are to be deleted, not rebased.
+  run. Steam gave the knob a concrete reason on 2026-09-20: some of sake's patches are
+  upstream Wine commits that CrossOver's next Wine rebase will contain — two then, four since
+  the WinHTTP stubs on 2026-09-29 — and the day the tarball sake builds is based on
+  wine-11.11 or later they are all to be deleted, not rebased.

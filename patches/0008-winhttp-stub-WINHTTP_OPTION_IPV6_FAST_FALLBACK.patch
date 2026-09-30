@@ -1,0 +1,33 @@
+winhttp: Stub WinHttpSetOption(WINHTTP_OPTION_IPV6_FAST_FALLBACK).
+
+Upstream Wine commit cefdd9ebe60188f3f021d9eb85b0fe7df01ad13a by Hans Leidekker
+<hans@codeweavers.com>, 2026-04-09, committed by Alexandre Julliard for wine-11.7.
+Carried here for the same reason as 0007: XCurl sets this option on its session, Wine 11.0
+fails it with ERROR_WINHTTP_INVALID_OPTION, and the request goes no further
+(docs/runtime.md, 2026-09-29). Drop it as soon as the CrossOver sources sake builds are
+based on wine-11.7 or later.
+
+The one hunk is placed by hand. Upstream adds the case after
+WINHTTP_OPTION_ENABLE_HTTP_PROTOCOL, which session_set_option in the 26.3.0 tree does not
+have yet, so here it goes directly before that function's default; the added lines are
+upstream's. Left to patch's default fuzz, upstream's own hunk lands in connect_query_option
+instead, applies without complaint and stubs nothing.
+
+--- a/dlls/winhttp/session.c
++++ b/dlls/winhttp/session.c
+@@ -279,6 +279,15 @@ static BOOL session_set_option( struct object_header *hdr, DWORD option, void *b
+         return TRUE;
+     }
+ 
++    case WINHTTP_OPTION_IPV6_FAST_FALLBACK:
++        if (buflen != sizeof(BOOL))
++        {
++            SetLastError( ERROR_INSUFFICIENT_BUFFER );
++            return FALSE;
++        }
++        FIXME( "WINHTTP_OPTION_IPV6_FAST_FALLBACK: %d\n", *(BOOL *)buffer );
++        return TRUE;
++
+     default:
+         FIXME( "unimplemented option %lu\n", option );
+         SetLastError( ERROR_WINHTTP_INVALID_OPTION );
