@@ -7,7 +7,9 @@ own `COPYING.LIB`, which is the licence these files are under. See `docs/licensi
 They apply to the `sources/wine` tree out of CodeWeavers' CrossOver tarball, with `-p1`.
 `WinePatcher` applies every `*.patch` here in name order before Wine is configured, and asks
 `patch` itself whether one is already in rather than keeping a marker — if it reverses
-cleanly it is applied. That stays true as patches are added or changed.
+cleanly it is applied. That stays true as patches are added or changed. The engine keeps a
+hash of the patches it was built from, and one built from others is built again from a
+fresh tree (`docs/wine-build.md`).
 
 Each file carries its reasoning in a prose header above the diff. **Read that before
 touching the patch**: sake's own patches were found by measurement, and the header is where

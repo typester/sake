@@ -75,9 +75,10 @@ repository has actually taken.
 
 ## Using it
 
-Open the app. The setup wizard comes up when the seven steps are not finished and stays out of
-the way when they are. It runs for tens of minutes, mostly compiling, and sends you to
-Apple's download page once, for the toolkit.
+Open the app. The setup wizard comes up until the seven steps are first finished, and stays out
+of the way afterwards: when an update leaves a step to do again, the sidebar says so instead.
+It runs for tens of minutes, mostly compiling, and sends you to Apple's download page once, for
+the toolkit.
 
 When it is done, the library has a bottle in it. Select the bottle and **Install from an
 Installer…** runs the game's installer inside it, with Rename and Delete alongside. Once

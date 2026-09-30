@@ -346,6 +346,102 @@ private func failure(in events: [WineEvent]) -> (reason: String, log: URL?)? {
     #expect(!builder.isBuilt)
 }
 
+/// CrossOver's tarball as the Sources step leaves it in `dl/`, made from the fake tree while
+/// nothing has patched it yet.
+private func archivePristineTree(in paths: Paths) throws {
+    let archive = Component.crossover.archiveURL(in: paths)
+    try FileManager.default.createDirectory(
+        at: archive.deletingLastPathComponent(), withIntermediateDirectories: true
+    )
+    let tar = Process()
+    tar.executableURL = URL(filePath: "/usr/bin/tar")
+    tar.arguments = ["-czf", archive.path, "-C", paths.cache.path, "sources/wine"]
+    try tar.run()
+    tar.waitUntilExit()
+    #expect(tar.terminationStatus == 0)
+}
+
+private func changePatch(in paths: Paths, inserting line: String) throws {
+    let patch = fakePatches(in: paths).appending(path: "0001-fake.patch")
+    let text = try String(contentsOf: patch, encoding: .utf8)
+        .replacingOccurrences(of: "+patched\n", with: "+\(line)\n")
+    try text.write(to: patch, atomically: true, encoding: .utf8)
+}
+
+@Test func anEngineBuiltFromOtherPatchesIsNoLongerBuilt() async throws {
+    let paths = temporaryRoot()
+    defer { remove(paths) }
+    try makeFakeTree(in: paths)
+
+    let builder = builder(in: paths)
+    _ = await collect(builder.build())
+    #expect(builder.isBuilt)
+    #expect(builder.outdatedReason == nil)
+
+    try changePatch(in: paths, inserting: "patched again")
+    #expect(builder.isOutdated)
+    #expect(!builder.isBuilt)
+    #expect(builder.outdatedReason?.hasPrefix("This engine was built from other patches") == true)
+}
+
+@Test func anEngineWithNoRecordOfItsPatchesIsTakenForAnOlderOne() throws {
+    let paths = temporaryRoot()
+    defer { remove(paths) }
+    try makeFakeTree(in: paths)
+    let wine = paths.engine.appending(path: "bin/wine")
+    try FileManager.default.createDirectory(at: wine.deletingLastPathComponent(), withIntermediateDirectories: true)
+    FileManager.default.createFile(atPath: wine.path, contents: nil)
+
+    // Every engine built before sake kept the record, which is every engine there is.
+    let builder = builder(in: paths)
+    #expect(builder.isOutdated)
+    #expect(builder.outdatedReason?.hasPrefix("This engine was built by an earlier sake") == true)
+
+    // With no patches to compare with, an engine that is there counts.
+    let bare = WineBuilder(paths: paths, patcher: WinePatcher(directory: nil))
+    #expect(bare.isBuilt)
+    #expect(!bare.isOutdated)
+}
+
+@Test func aRebuildStartsFromCrossOversOwnTree() async throws {
+    let paths = temporaryRoot()
+    defer { remove(paths) }
+    try makeFakeTree(in: paths)
+    try archivePristineTree(in: paths)
+
+    let builder = builder(in: paths)
+    _ = await collect(builder.build())
+
+    // A changed patch cannot be taken off a tree that has the old one: patched in place,
+    // this would stop with "applies to neither".
+    try changePatch(in: paths, inserting: "patched again")
+    let events = await collect(builder.build())
+
+    let phases = events.compactMap { event -> WinePhase? in
+        if case .phase(let phase) = event { phase } else { nil }
+    }
+    #expect(phases.first == .unpack)
+    #expect(failure(in: events) == nil)
+    let source = Component.crossover.unpackedURL(in: paths)
+    let patched = try String(contentsOf: source.appending(path: "dlls/ntdll/unix/loader.c"), encoding: .utf8)
+    #expect(patched == "one\ntwo\npatched again\nthree\n")
+    #expect(builder.isBuilt)
+}
+
+@Test func aBuildThatFailsItsChecksLeavesNoRecord() async throws {
+    let paths = temporaryRoot()
+    defer { remove(paths) }
+    try makeFakeTree(in: paths, glue: false)
+
+    // make install has written bin/wine by the time verify refuses the tree.
+    let builder = builder(in: paths)
+    _ = await collect(builder.build())
+
+    #expect(FileManager.default.fileExists(atPath: paths.engine.appending(path: "bin/wine").path))
+    #expect(!FileManager.default.fileExists(atPath: builder.stampURL.path))
+    #expect(!builder.isBuilt)
+}
+
 /// Wine's own tools, run in a bottle. The engine ships them as Windows programs under
 /// `lib/wine/x86_64-windows/`, so what starts them is the bare name and nothing else.
 @Test func eachWineToolIsStartedByItsBareNameInTheBottle() throws {

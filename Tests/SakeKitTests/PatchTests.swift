@@ -331,3 +331,26 @@ private func read(_ tree: URL) throws -> String {
         try await WinePatcher(directory: nil).apply(to: tree)
     }
 }
+
+@Test func theFingerprintFollowsThePatchesAndNothingElse() throws {
+    let root = temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let (_, patches) = try makeTree(in: root)
+    let patcher = WinePatcher(directory: patches)
+    let first = try #require(patcher.fingerprint())
+
+    try "What this directory is.\n".write(to: patches.appending(path: "README.md"), atomically: true, encoding: .utf8)
+    #expect(patcher.fingerprint() == first)
+
+    let patch = patches.appending(path: "0001-fake.patch")
+    let reworded = try String(contentsOf: patch, encoding: .utf8)
+        .replacingOccurrences(of: "Say what it does here", with: "Say it differently")
+    try reworded.write(to: patch, atomically: true, encoding: .utf8)
+    let second = try #require(patcher.fingerprint())
+    #expect(second != first)
+
+    try reworded.write(to: patches.appending(path: "0002-another.patch"), atomically: true, encoding: .utf8)
+    #expect(patcher.fingerprint() != second)
+
+    #expect(WinePatcher(directory: nil).fingerprint() == nil)
+}

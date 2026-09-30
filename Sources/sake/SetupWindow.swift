@@ -56,7 +56,7 @@ struct SetupWindow: View {
         switch model.state(of: candidate) {
         case .done: "checkmark.circle.fill"
         case .blocked: "lock"
-        case .ready: candidate == step ? "arrowtriangle.right.fill" : "circle"
+        case .ready, .outdated: candidate == step ? "arrowtriangle.right.fill" : "circle"
         }
     }
 
@@ -75,7 +75,7 @@ struct SetupWindow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            if case .blocked(let why) = model.state(of: step) {
+            if let why = model.state(of: step).reason {
                 Text(why)
                     .font(.callout)
                     .foregroundStyle(.orange)

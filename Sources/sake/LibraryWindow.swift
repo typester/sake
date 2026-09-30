@@ -34,13 +34,25 @@ struct LibraryWindow: View {
             .safeAreaInset(edge: .bottom) {
                 // Only what is about the library rather than about one bottle: putting a
                 // game in, or taking a bottle away, belongs to the bottle it happens to.
-                Button {
-                    model.isCreatingBottle = true
-                } label: {
-                    Label("New Bottle…", systemImage: "plus")
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 8) {
+                    if model.setupNeedsAttention {
+                        Button {
+                            openWindow(id: WindowID.setup)
+                        } label: {
+                            Label("Setup needs attention", systemImage: "exclamationmark.circle")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.orange)
+                    }
+                    Button {
+                        model.isCreatingBottle = true
+                    } label: {
+                        Label("New Bottle…", systemImage: "plus")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.borderless)
                 }
-                .buttonStyle(.borderless)
                 .padding(10)
             }
         } detail: {
@@ -99,8 +111,11 @@ struct LibraryWindow: View {
             model.watchForSignIns()
             await model.check()
             // First run lands here with nothing built, so the wizard opens itself rather
-            // than leaving an empty window and a button to find.
-            if !isReady { openWindow(id: WindowID.setup) }
+            // than leaving an empty window and a button to find. Only then: a step an update
+            // leaves to do again gets the line above New Bottle… instead.
+            if model.setup.opensItself(machineIsReady: model.machineIsReady) {
+                openWindow(id: WindowID.setup)
+            }
         }
     }
 
@@ -201,9 +216,7 @@ struct LibraryWindow: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var isReady: Bool {
-        model.setup.isComplete(machineIsReady: model.machineIsReady)
-    }
+    private var isReady: Bool { model.setupIsComplete }
 
     private var selected: Bottle? { model.bottle(named: model.selectedBottle) }
 

@@ -5,6 +5,7 @@ enum WineStatus: Equatable {
     case working(phase: String, line: String)
     case built(version: String)
     case alreadyBuilt
+    case outdated
     case failed(String)
 }
 
@@ -41,6 +42,10 @@ struct WineView: View {
                         .foregroundStyle(.secondary)
                 case .alreadyBuilt:
                     Text("already built")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                case .outdated:
+                    Text("needs building again")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 case .failed(let reason):

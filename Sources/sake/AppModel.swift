@@ -57,6 +57,12 @@ final class AppModel {
     var d3dMetal: D3DMetalStatus?
     var gdkRuntime: GDKRuntimeStatus?
 
+    /// Setup as ``survey()`` last read it. A view that asks ``Setup`` itself reads the disk,
+    /// which SwiftUI does not watch, so the library went on saying a step was left after the
+    /// wizard had done it.
+    var setupIsComplete = false
+    var setupNeedsAttention = false
+
     /// Keyed by bottle name, the way `sources` and `prefix` are keyed by component: the
     /// wizard watches `default` while the library may be making another one.
     var bottleStatus: [String: BottleStatus] = [:]
@@ -261,7 +267,12 @@ final class AppModel {
         for recipe in BuildRecipe.all where recipe.isBuilt(in: paths.engine) {
             prefix[recipe.id] = .alreadyBuilt
         }
-        if WineBuilder(paths: paths).isBuilt { wine = .alreadyBuilt }
+        let wineBuilder = WineBuilder(paths: paths)
+        if wineBuilder.isBuilt {
+            wine = .alreadyBuilt
+        } else if wineBuilder.isOutdated {
+            wine = .outdated
+        }
 
         let installer = D3DMetalInstaller(paths: paths)
         if installer.isInstalled {
@@ -295,6 +306,9 @@ final class AppModel {
         measureSelectedBottle()
 
         surveyImportSources()
+
+        setupIsComplete = setup.isComplete(machineIsReady: machineIsReady)
+        setupNeedsAttention = setup.needsAttention(machineIsReady: machineIsReady)
     }
 
     /// Called from ``survey()`` and again when the selection moves: without the second
@@ -460,7 +474,10 @@ final class AppModel {
         case .phase(let phase): wine = .working(phase: phase.rawValue, line: "")
         case .output(let line):
             if case .working(let phase, _) = wine { wine = .working(phase: phase, line: line) }
-        case .installed(let version): wine = .built(version: version)
+        case .installed(let version):
+            wine = .built(version: version)
+            // make install puts Wine's own d3d DLLs back, so what survey() found is gone.
+            if !D3DMetalInstaller(paths: paths).isInstalled { d3dMetal = nil }
         case .failed(let reason, _): wine = .failed(reason)
         case .finished: break
         }

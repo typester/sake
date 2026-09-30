@@ -119,3 +119,48 @@ private func finish(_ step: SetupStep, in paths: Paths) throws {
     #expect(setup.current(machineIsReady: false) == .machine)
     #expect(setup.state(of: .machine, machineIsReady: false) == .ready)
 }
+
+@Test func anEngineBuiltFromOtherPatchesSendsSetupBackToWine() throws {
+    let paths = temporaryRoot()
+    defer { remove(paths) }
+    for step in SetupStep.allCases { try finish(step, in: paths) }
+    let patches = paths.root.deletingLastPathComponent().appending(path: "patches")
+    try FileManager.default.createDirectory(at: patches, withIntermediateDirectories: true)
+    try "A patch.\n".write(to: patches.appending(path: "0001-a.patch"), atomically: true, encoding: .utf8)
+    let setup = Setup(paths: paths, runtimeSources: nil, patches: patches)
+
+    // bin/wine with no record of what it was built from, as every engine before the record.
+    guard case .outdated(let why) = setup.state(of: .wine, machineIsReady: true) else {
+        Issue.record("an engine with no record of its patches still counts as built")
+        return
+    }
+    #expect(why.contains("earlier sake"))
+    #expect(setup.current(machineIsReady: true) == .wine)
+    // The steps after it stay done until the rebuild's make install undoes D3DMetal.
+    #expect(setup.state(of: .d3dMetal, machineIsReady: true) == .done)
+    #expect(setup.state(of: .bottle, machineIsReady: true) == .done)
+
+    let record = try #require(WinePatcher(directory: patches).fingerprint())
+    let stamp = paths.engine.appending(path: "lib/wine/sake-patches.sha256")
+    try FileManager.default.createDirectory(at: stamp.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try Data("\(record)\n".utf8).write(to: stamp)
+    #expect(setup.state(of: .wine, machineIsReady: true) == .done)
+}
+
+@Test func theWizardOpensItselfOnlyUntilThereIsABottle() throws {
+    let paths = temporaryRoot()
+    defer { remove(paths) }
+    let setup = Setup(paths: paths, runtimeSources: nil)
+
+    #expect(setup.opensItself(machineIsReady: true))
+    #expect(!setup.needsAttention(machineIsReady: true))
+
+    for step in SetupStep.allCases { try finish(step, in: paths) }
+    #expect(!setup.opensItself(machineIsReady: true))
+    #expect(!setup.needsAttention(machineIsReady: true))
+
+    // A step an update sends back once there is a bottle is pointed out, not opened.
+    try FileManager.default.removeItem(at: GDKRuntime(paths: paths).dll)
+    #expect(!setup.opensItself(machineIsReady: true))
+    #expect(setup.needsAttention(machineIsReady: true))
+}

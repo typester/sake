@@ -1,6 +1,7 @@
 import Foundation
 
 public enum WinePhase: String, Sendable {
+    case unpack
     case patch
     case configure
     case sonames
@@ -63,24 +64,61 @@ public struct WineBuilder: Sendable {
     private let paths: Paths
     private let runner: ProcessRunner
     private let patcher: WinePatcher
+    private let unpacker: Unpacker
 
     public init(
         paths: Paths = .default,
         runner: ProcessRunner = ProcessRunner(),
-        patcher: WinePatcher = WinePatcher()
+        patcher: WinePatcher = WinePatcher(),
+        unpacker: Unpacker = Unpacker()
     ) {
         self.paths = paths
         self.runner = runner
         self.patcher = patcher
+        self.unpacker = unpacker
     }
 
     public var prefix: URL { paths.engine }
 
     public var logURL: URL { paths.build.appending(path: "wine.log") }
 
-    public var isBuilt: Bool {
+    var stampURL: URL { prefix.appending(path: "lib/wine/sake-patches.sha256") }
+
+    /// Built, and from the patches this copy of sake carries. Without patches to compare
+    /// with, an engine that is there counts.
+    public var isBuilt: Bool { hasWine && !isOutdated }
+
+    /// Built, but from other patches, or by a sake that kept no record of them. See
+    /// docs/wine-build.md.
+    public var isOutdated: Bool {
+        guard hasWine, let expected = expectedPatches else { return false }
+        return recordedPatches != expected
+    }
+
+    /// Why the step has to be done again, when it does.
+    public var outdatedReason: String? {
+        guard isOutdated else { return nil }
+        let which = recordedPatches == nil
+            ? "This engine was built by an earlier sake and may lack patches this one carries."
+            : "This engine was built from other patches than this copy of sake carries."
+        return which + " Building it again takes as long as the first build, and D3DMetal goes back in afterwards with one press."
+    }
+
+    private var hasWine: Bool {
         FileManager.default.fileExists(atPath: prefix.appending(path: "bin/wine").path)
     }
+
+    private var recordedPatches: String? {
+        (try? String(contentsOf: stampURL, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The patches inside the app are hashed once per process: the wizard asks every step's
+    /// state many times each time it draws.
+    private var expectedPatches: String? {
+        patcher.directory == WinePatcher.bundled ? Self.bundledPatches : patcher.fingerprint()
+    }
+
+    private static let bundledPatches: String? = WinePatcher().fingerprint()
 
     /// What has to exist before this can start, as a sentence, or `nil` when it can.
     public var missingPrerequisite: String? {
@@ -207,6 +245,13 @@ public struct WineBuilder: Sendable {
         let make = URL(filePath: "/usr/bin/make")
         let jobs = ProcessInfo.processInfo.activeProcessorCount
 
+        // Only a step that is not done gets here, so an engine that is there is one from
+        // other patches.
+        if hasWine {
+            onPhase(.unpack)
+            try await unpackAgain(source, log: log, onOutput: onOutput)
+        }
+
         onPhase(.patch)
         try await patcher.apply(to: source) { line in
             log.write(line + "\n")
@@ -243,6 +288,32 @@ public struct WineBuilder: Sendable {
 
         onPhase(.verify)
         try await verify(log: log)
+
+        // Last, so that a build stopped part way does not count as one from these patches.
+        if let expected = expectedPatches {
+            try Data("\(expected)\n".utf8).write(to: stampURL, options: .atomic)
+            log.write("=== record \(stampURL.path)\n")
+        }
+    }
+
+    /// Back to CrossOver's own tree: a patch that changed or went cannot be taken off a tree
+    /// that has it. With no archive to start from, the tree is patched as it is, which is
+    /// enough for a patch that was only added.
+    private func unpackAgain(
+        _ source: URL,
+        log: LogFile,
+        onOutput: @Sendable (String) -> Void
+    ) async throws {
+        let component = Component.crossover
+        let archive = component.archiveURL(in: paths)
+        guard FileManager.default.fileExists(atPath: archive.path) else {
+            log.write("=== unpack no \(archive.path), so the tree is patched as it is\n")
+            return
+        }
+        log.write("=== unpack \(archive.path)\n")
+        onOutput("unpacking \(archive.lastPathComponent)")
+        try FileManager.default.removeItem(at: source)
+        try await unpacker.unpack(archive, into: component.destinationURL(in: paths), members: component.members)
     }
 
     private func runPhase(

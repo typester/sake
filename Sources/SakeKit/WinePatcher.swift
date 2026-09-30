@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 public struct WinePatch: Sendable, Equatable, Identifiable {
@@ -83,6 +84,18 @@ public struct WinePatcher: Sendable {
             .map(WinePatch.init)
         guard !patches.isEmpty else { throw PatchError.noPatches(directory: directory.path) }
         return patches
+    }
+
+    /// Every patch's name and contents as one hash, which the engine keeps to say what it was
+    /// built from, or `nil` when there are no patches to hash. See docs/wine-build.md.
+    public func fingerprint() -> String? {
+        guard let patches = try? patches() else { return nil }
+        var hasher = SHA256()
+        for patch in patches {
+            guard let digest = try? SourceFetcher.sha256(of: patch.url) else { return nil }
+            hasher.update(data: Data("\(patch.id)\0\(digest)\n".utf8))
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
     /// Apply every patch to `tree`, skipping the ones already in it.

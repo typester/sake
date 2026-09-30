@@ -333,7 +333,8 @@ find; and nothing but a GDK title loads the DLL. A copy of sake's own is replace
 differs from the engine's, and a copy that is not sake's, such as the community stand-in, is
 left where it is; sake tells the two apart by a string its build carries. The step counts as
 done only while the engine's copy was built from the source that Sake.app carries, so an
-update that changes the runtime sends the person back to it.
+update that changes the runtime leaves the step to do again, which the library's sidebar
+points out; until 2026-09-30 the wizard opened itself for it.
 
 An installer is given it too, because Steam's can start Steam as it finishes, and a game
 installed in that Steam never passes through sake's Play; that has not been tried in sake. A

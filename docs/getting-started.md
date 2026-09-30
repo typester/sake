@@ -29,7 +29,8 @@ Privacy & Security, or install with `--no-quarantine`.
 ## 2. Set sake up
 
 Open sake. The wizard opens itself until the seven steps are done; afterwards **Set Up…** in the
-toolbar brings it back.
+toolbar brings it back. If the sidebar says **Setup needs attention** after an update, click it: the
+wizard opens on the step to do again.
 
 ### This Mac
 

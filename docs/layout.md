@@ -15,6 +15,8 @@ those were measured in sake.
     engine/lib/xgameruntime/                 sake's GDK runtime, the licence of the
                                              libHttpClient in it, and a hash of what it was
                                              built from — see gdk.md
+    engine/lib/wine/sake-patches.sha256      a hash of the patches Wine was built from —
+                                             see wine-build.md
     bottles/<name>/                          one prefix each, and the games in them; empty
                                              is 1 GB, and a cloned game adds nothing
     bottles/<name>/sake-titles.json          what was added to the library by hand, if

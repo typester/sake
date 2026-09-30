@@ -67,11 +67,11 @@ and the rest are sake's own; each file's header says which it is and where it ca
 What each one is for, and how to tell that it worked, is in `runtime.md`; why they are a
 separate directory is in `licensing.md`.
 
-They are applied to the unpacked source tree, which is the only copy sake has of it, so the
-build has one step that is not out of tree. Whether a patch is already in is asked of
-`patch` itself — a patch that reverses cleanly is applied — rather than recorded in a marker
-file, because the tarball is unpacked once and never re-extracted and a marker would have to
-be invalidated by hand every time a patch changed.
+They are applied to the unpacked source tree, so the build has one step that is not out of
+tree. Whether a patch is already in is asked of `patch` itself — a patch that reverses
+cleanly is applied — rather than recorded in a marker file, which would have to be
+invalidated by hand every time a patch changed. What the engine was built from is
+recorded, as a hash of the patches themselves, which nothing has to invalidate (below).
 
 **Patches on one file stack, and the check knows it.** Measured 2026-09-20, on the second
 build after the four winemac.drv patches went in: 0003 no longer reversed on its own once
@@ -99,10 +99,29 @@ so did 0009 when it was added on 2026-09-30.
 compiles, installs and passes every check in this document. What it cannot do is start a
 game, and that is a long way downstream of here.
 
-An engine that is already built does not pick a new patch up: `make install` is what writes
-`bin/wine`, and its presence is what says the step is done. Changing a patch means deleting
-that and rebuilding, and that is a full build rather than an incremental one: measured at
-4m24s on 2026-09-19, no cheaper than the first.
+**An engine built from other patches is built again.** After `verify`, the build records a
+hash of every patch's name and contents in `lib/wine/sake-patches.sha256`, and the Wine step
+counts as done only while `bin/wine` is there and that hash is the one of the patches
+Sake.app carries, as the GDK runtime's step does with its source (`gdk.md`). An engine with
+another hash, or with none because an earlier sake built it, leaves the step to do again:
+the library's sidebar says so, and the step says which of the two it is. Building again
+unpacks CrossOver's tree afresh from its archive in `dl/` before patching, because a patch
+that changed or went cannot be taken back off a tree that has it; with no archive there, the
+tree is patched as it is, which is enough for a patch that was only added. It is a full
+build rather than an incremental one: measured at 4m24s on 2026-09-19, no cheaper than the
+first. Two copies of sake that carry different patches each take the other's engine for one
+to build again; only a development build run beside a release does that. Until 2026-09-30
+this said an engine that is already built does not pick a new patch up, and that changing
+one meant deleting `bin/wine` by hand.
+
+Measured in sake on 2026-09-30, on an engine built with all nine patches before sake
+recorded them: the wizard stayed shut and the sidebar said Setup needs attention; the Wine
+step, opened from there, gave the reason for an engine with no record. Build unpacked the
+archive and applied all nine patches to the fresh tree within five seconds, none of them
+found already in, and the whole step took 5m01s (4m17s when run again with the record
+removed). D3DMetal's step was then unfinished with its row at waiting, and one press put
+Apple's four DLLs back, each hashing as before. On the rebuilt engine Minecraft Dungeons II
+reached character select in the `ex` bottle.
 
 ## configure flags that must not be removed
 
