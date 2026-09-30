@@ -228,6 +228,13 @@ every string. The panes scroll now, which keeps the modifier — it is there so 
 wraps instead of being truncated — and bounds what the demand can do. The setup wizard had
 been doing this from the start.
 
+### Phase 5 — GDK titles (planned)
+
+A runtime DLL and a sign-in of sake's own, so that a title built on Microsoft's GDK runs
+without Gaming Services or a community stand-in. `gdk.md` has what was measured, the design
+and the order. The first piece is in: two WinHTTP stubs, without which the GDK's HTTP client
+drops every request (2026-09-29, `runtime.md`).
+
 ## The Swift/subprocess boundary
 
 Settled during planning on 2026-09-18, recorded here so it is not relitigated.

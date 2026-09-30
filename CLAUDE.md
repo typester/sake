@@ -120,6 +120,7 @@ implementing anything it covers.
 | `docs/roadmap.md` | phases, and the settled boundary between Swift and subprocesses |
 | `docs/wine-build.md` | building Wine; the configure flags that must not be removed |
 | `docs/runtime.md` | the three settings games need, the Play-button root cause, controllers, failure states |
+| `docs/gdk.md` | GDK titles: the runtime DLL and the sign-in sake provides in place of Gaming Services |
 | `docs/licensing.md` | what may not be redistributed, and what the app may not do for the user |
 | `docs/layout.md` | on-disk layout, why nothing mutable goes in the bundle, relocatability |
 | `docs/releasing.md` | how a release is cut, and the three things it needs that are not in this repository |

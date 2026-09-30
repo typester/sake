@@ -106,6 +106,15 @@ Any patch sake carries against Wine's own source is a derivative of LGPL code an
 `README.md`. A patch belongs nowhere else — burying one in `Sources/` to make a build system
 happy would hide the one thing about it that has to be visible.
 
+## GDK titles
+
+For titles built on Microsoft's GDK, sake provides its own stand-in for the Gaming Runtime
+(`gdk.md`). It never ships, downloads or copies Microsoft's GDK or Gaming Services, and it
+takes nothing from the community stand-in, whose repository has no licence. Code that
+starts from WineGDK comes from the part its author declared CC0 and says so in its header.
+Signing in uses the title's own `MSAAppId` from its `MicrosoftGame.config`; sake signs in as
+no other application.
+
 ## Why D3DMetal cannot simply be avoided
 
 Metal is documented and anyone may write against it, but it is not open the way Vulkan is —
