@@ -62,9 +62,10 @@ tap. The tap's own documentation is deliberately thin and points back here.
 
 ## Not verified
 
-- **Nobody has installed the cask**, here or anywhere. `brew fetch --cask sake` downloaded
-  v0.1.0 and the checksum matched; there was no install, no first launch, and so nothing
-  has seen what Gatekeeper does with an ad-hoc signature that arrived through brew.
+- **The cask has been installed once, on the owner's Mac**: 0.1.1, on 2026-09-21, without
+  `--no-quarantine`, and it has run there since. What Gatekeeper showed on that first launch is
+  not recorded, and no second Mac has installed it. Before that, `brew fetch --cask sake`
+  downloaded v0.1.0 and the checksum matched.
 - `brew audit --cask --online` has not been run: Homebrew refuses to start on the machine
   this was written on, wanting Xcode 27 where it finds 26.4.
 - Neither `workflow_dispatch` recovery path has been used.

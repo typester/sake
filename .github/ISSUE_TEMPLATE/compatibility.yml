@@ -1,0 +1,60 @@
+name: Compatibility report
+description: How a game ran with sake — working or not.
+title: "Compatibility: "
+labels: ["compatibility"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A game that runs is worth reporting as much as one that does not: these reports are what the README's list of games is made from.
+  - type: input
+    id: game
+    attributes:
+      label: Game
+      placeholder: Diablo IV
+    validations:
+      required: true
+  - type: input
+    id: store
+    attributes:
+      label: Store or launcher
+      placeholder: Steam, Battle.net, the publisher's own installer…
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: How far did it get?
+      options:
+        - It plays
+        - It plays, with problems
+        - It starts but cannot be played
+        - It does not start
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: sake version
+      description: In the app menu, About Sake.
+      placeholder: 0.2.0
+    validations:
+      required: true
+  - type: input
+    id: mac
+    attributes:
+      label: Mac and macOS version
+      placeholder: MacBook Air (M2), macOS 26.1
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: What you did, and what happened
+      description: Anything you changed on the way — arguments, environment variables, winecfg settings — and anything that did not work, such as online play or a controller.
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: If it did not work, the title's log from `~/Library/Caches/Sake/build/` (`title-<name>.log`). Paths in it show your macOS user name.
+      render: text

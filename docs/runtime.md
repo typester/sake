@@ -1,38 +1,43 @@
-# Running games: the settings, the patches, and how to tell failures apart
+# Running games: the settings every run needs, and what each patch fixes
 
-A built Wine is not a working one. This is what the d4-mac prototype needed on top of the
-build to get Diablo IV from "starts" to "plays", verified 2026-09-17 and 2026-09-18 on one
-machine. **sake now creates prefixes and starts the Battle.net client in one**, dated in
-the sections below, and it builds the file layout D3DMetal needs. No game has been started,
-so everything from the Play button onwards is still the prototype's.
+A built Wine is not a working one. This file is what a game needs on top of the build — the
+bottle, three settings, how a title is started and stopped — and the nine patches sake carries,
+each with what it fixes and how to tell that it is working. Without the patches Wine still
+configures, installs and passes every check, and fails only once a game starts, which is why
+setup refuses to build it with none. [how-it-works.md](how-it-works.md#what-sake-changes-in-wine)
+has the patches in one table, and [debugging.md](debugging.md) the instruments.
 
-## Creating a prefix
+*A measurement without a tag is the d4-mac prototype's, made on one machine on 2026-09-17 and
+2026-09-18; sake's own measurements and the owner's reports say so.*
 
-`wine wineboot --init` makes it, and `wineserver -w` is where it finishes — Wine's processes
-outlive the command that started them, so returning from wineboot is not the end.
+## A bottle
 
-**`WINEDLLOVERRIDES="mscoree,mshtml=d"`, or wineboot never returns.** Without it wineboot
-puts up the Wine Mono installer's dialog and waits for a click that never comes: 0% CPU
-inside `CFRunLoopRun` → `mach_msg` forever, and `syswow64` is never populated. (Prototype,
-2026-09-17.)
+**`wine wineboot --init` makes a prefix, and `wineserver -w` is where it finishes.** Wine's
+processes outlive the command that started them, so returning from wineboot is not the end.
 
-**An empty `syswow64` is the one check worth making.** It means WoW64 did not initialise, so
-no 32-bit application will run — and Battle.net's launcher is 32-bit. Everything else about
-the prefix looks finished when this is what happened.
+**`WINEDLLOVERRIDES="mscoree,mshtml=d"`, or wineboot never returns.** Without it wineboot puts
+up the Wine Mono installer's dialog and waits for a click that never comes: 0% CPU inside
+`CFRunLoopRun` → `mach_msg` forever, and `syswow64` is never populated (prototype, 2026-09-17).
+
+**An empty `syswow64` is the one check worth making.** It means WoW64 did not initialise, so no
+32-bit application will run, and Battle.net's launcher is 32-bit. Everything else about the
+prefix looks finished when this is what happened. A populated one ran them: Battle.net's
+installer is `PE32 … Intel 80386`, and run through the app it installed a client that is PE32
+too and left a 57 KB log under `build/` (sake, 2026-09-20).
 
 **Turn the crash dialog off before anything can crash**: `ShowCrashDialog=0` under
-`HKCU\Software\Wine\WineDbg`. Otherwise a crash spawns `winedbg --auto`, which puts up a
-dialog and holds the process until somebody clicks Close — an unattended command just blocks
-until it times out — and resets `WINEDEBUG` on the way, so suppressed logging comes roaring
-back into whatever was being debugged. (Prototype, 2026-09-18.)
+`HKCU\Software\Wine\WineDbg`. Otherwise a crash spawns `winedbg --auto`, which puts up a dialog
+and holds the process until somebody clicks Close — an unattended command just blocks until it
+times out — and resets `WINEDEBUG` on the way, so suppressed logging comes roaring back into
+whatever was being debugged (prototype, 2026-09-18). Both halves showed up in sake: with the
+value set, a run whose render process kept hitting a breakpoint carried on unattended instead
+of stopping on a dialog, and `winedbg --auto` still ran and symbolised, spilling 880 lines of
+`dbghelp_dwarf` fixmes into a run made with `WINEDEBUG=-all` (sake, 2026-09-19).
 
-Both halves of that showed up in sake on 2026-09-19. With the value set, a run whose render
-process kept hitting a breakpoint carried on unattended instead of stopping on a dialog —
-and `winedbg --auto` still ran and symbolised, spilling 880 lines of `dbghelp_dwarf` fixmes
-into a run made with `WINEDEBUG=-all`.
+**wineserver keeps the registry in memory and writes it out lazily**, so `user.reg` read from
+disk can be stale; take the server down first, then read the file (prototype, 2026-09-18).
 
-sake created its first bottle on 2026-09-19 (Apple M5, macOS 27.0, against the engine built
-the same day). What that cost and what came out:
+*sake's first bottle, 2026-09-19: Apple M5, macOS 27.0, the engine built the same day.*
 
 | | |
 |---|---|
@@ -41,51 +46,50 @@ the same day). What that cost and what came out:
 | the bottle | 997 MB, 801 files in `system32` and 841 in `syswow64` |
 | everything Wine printed | MoltenVK's three-line banner. No `err:`, no `fixme:`, nothing else |
 
-Two things in a fresh bottle that a path in this document may not lead you to expect:
+Two things in a fresh bottle that a path in these files may not lead you to expect:
 
-- **The Windows user is `crossover`,** not the account's short name — `drive_c/users/crossover`.
+- **The Windows user is `crossover`,** not the account's short name: `drive_c/users/crossover`.
   CrossOver's tree does this, and the prototype's bottle has the same directory, so every
-  `drive_c/users/<user>/…` path below means that one.
-- **`dosdevices` maps whatever was mounted at the time.** A bottle created while Apple's
-  Game Porting Toolkit is still mounted gets a `d:` pointing into `/Volumes`, which dangles
-  as soon as it is ejected. Harmless, and worth recognising rather than debugging.
+  `drive_c/users/…` path in these files means that one.
+- **`dosdevices` maps whatever was mounted at the time.** A bottle created while Apple's Game
+  Porting Toolkit is still mounted gets a `d:` pointing into `/Volumes`, which dangles as soon
+  as it is ejected. Harmless, and worth recognising rather than debugging.
 
-## Three settings carry the whole thing
+## Three settings every run needs
 
 None is on by default, and no symptom resembles its cause.
 
-**Two of the three are sake's to apply and one is not.** `WINE_SIMULATE_WRITECOPY` and
-`CX_APPLEGPTK_LIBD3DSHARED_PATH` are environment, so `Bottle.environment` puts them on
-everything the engine runs. `--in-process-gpu` and the two ANGLE flags beside it are
-**Chromium's**, and mean something only to a program built on CEF — putting them on a game
-that reads its own `argv` is not free. sake therefore offers them when it can see it is
-dealing with a Chromium app, and otherwise leaves the arguments empty.
+**Two are environment and sake's to apply; one is Chromium's and is not.**
+`WINE_SIMULATE_WRITECOPY` and `CX_APPLEGPTK_LIBD3DSHARED_PATH` are environment, so
+`Bottle.environment` puts them on everything the engine runs. `--in-process-gpu` and the two
+ANGLE flags beside it are **Chromium's**, and mean something only to a program built on CEF —
+putting them on a game that reads its own `argv` is not free. sake therefore offers them when it
+can see it is dealing with a Chromium app, and otherwise leaves the arguments empty.
 
-What it looks for is `libcef.dll`, **beside the program or one directory below it**.
-Measured against a real Battle.net install on 2026-09-20: the exe is
-`Battle.net/Battle.net.exe` and its CEF build is `Battle.net/Battle.net.17821/libcef.dll`,
-so looking only beside the program finds nothing and the flags would never be offered for
-the one title that is known to need them.
+What it looks for is `libcef.dll`, **beside the program or one directory below it**. A real
+Battle.net install has its exe at `Battle.net/Battle.net.exe` and its CEF build at
+`Battle.net/Battle.net.17821/libcef.dll`, so looking only beside the program would never offer
+the flags to the one title known to need them (sake, 2026-09-20).
 
-**Those three flags are Battle.net's, not Chromium's in general.** Steam's client, the second
-Chromium app through sake (2026-09-20), takes none of them: `steam.exe` consumes whatever it
-is given and passes nothing through to `steamwebhelper.exe`, and Steam's own switch list has
-no in-process-GPU option left. Its `libcef.dll` also sits three directories down, so the
-heuristic never offers them for it — correctly, as it turns out. What Steam needed was in
-the driver, not in the arguments; the section on Steam below has the measurement.
+**The flags are Battle.net's, not Chromium's in general.** Steam's client takes none of them:
+`steam.exe` consumes whatever it is given and passes nothing through to `steamwebhelper.exe`,
+and Steam's own switch list has no in-process-GPU option left. Its `libcef.dll` sits three
+directories down, so the heuristic never offers them for it — correctly, as it turns out. What
+Steam needed was in the driver ([below](#steam-one-process-draws-another-owns-the-window))
+(sake, 2026-09-20).
 
-### `WINE_SIMULATE_WRITECOPY=1` — or Battle.net never fetches the login page
+### `WINE_SIMULATE_WRITECOPY=1` — or Battle.net never fetches its login page
 
 CodeWeavers' `CW Hack 22996`. With it, a page that has been `VirtualProtect`ed away from
 `PAGE_WRITECOPY` is reported as already copied, which is what Windows does.
 
-Without it, every CEF render process executes an `int3` within five seconds of starting,
-always at the same address; `UAuth: begin loading` never appears and the login page is never
-even requested. CodeWeavers told Battle.net users to set this by hand in 2023 and it is
+Without it, every CEF render process executes an `int3` within five seconds of starting, always
+at the same address; `UAuth: begin loading` never appears and the login page is never even
+requested (prototype). CodeWeavers told Battle.net users to set this by hand in 2023, and it is
 still not automatic.
 
-sake measured that on 2026-09-19 by starting the client twice with nothing different but
-this variable:
+*Measured in sake on 2026-09-19, by starting the client twice with nothing different but this
+variable:*
 
 | | with it | without it |
 |---|---|---|
@@ -93,84 +97,82 @@ this variable:
 | `UAuth: begin loading` | present, then `finished loading. statusCode=200 state=Login` | never appears |
 | `Battle.net.exe` processes | 4 | 3 |
 
-`0x80000003` is `STATUS_BREAKPOINT`, which is the `int3`, and the first arrives nine seconds
-in and then one every five seconds after it. Same bottle, same arguments, same other three
-variables: this one line is the difference between a login page and a breakpoint.
+`0x80000003` is `STATUS_BREAKPOINT`, which is the `int3`; the first arrives nine seconds in, and
+then one every five seconds. Same bottle, same arguments, same other three variables: this one
+line is the difference between a login page and a breakpoint.
 
-### `--in-process-gpu` — or the login form is drawn but never shown
+### `--in-process-gpu` and ANGLE — or Battle.net's login form is drawn but never shown
 
 With a separate GPU process the login web view never gets a compositor surface of its own.
-MoltenVK reports swapchains for the window (348x646) and the chrome strip (348x50) but never
-one the size of the page content (348x558); the view stays black while the renderer paints
-the form perfectly. Folding the GPU into the browser process makes the content surface
-appear.
+MoltenVK reports swapchains for the window (348x646) and the chrome strip (348x50) but never one
+the size of the page content (348x558); the view stays black while the renderer paints the form
+perfectly. Folding the GPU into the browser process makes the content surface appear
+(prototype).
 
 This is not a graphics setting in disguise. Turning off Battle.net's own browser hardware
-acceleration changes nothing, `--disable-direct-composition` changes nothing, and fonts are
-not involved.
+acceleration changes nothing, `--disable-direct-composition` changes nothing, and fonts are not
+involved.
 
 Battle.net also needs `--use-gl=angle --use-angle=vulkan`. Left alone, ANGLE tries its D3D11
-backend (which gets nothing — D3DMetal has no 32-bit half), then SwANGLE, then gives up with
-"GL is disabled" and the GPU process exits with `ACCESS_VIOLATION`.
+backend, which gets nothing because D3DMetal has no 32-bit half, then SwANGLE, then gives up
+with "GL is disabled", and the GPU process exits with `ACCESS_VIOLATION` (prototype).
 
 ### `CX_APPLEGPTK_LIBD3DSHARED_PATH` — or Diablo IV does not start at all
 
-Apple's `libd3dshared.dylib` exports `register_non_native_code_region`, which is how Rosetta
-is told a region of memory holds dynamically generated x86_64 code. Wine only looks that
-symbol up when this variable points at the library (`init_non_native_support()` in
+Apple's `libd3dshared.dylib` exports `register_non_native_code_region`, which is how Rosetta is
+told a region of memory holds dynamically generated x86_64 code. Wine looks that symbol up only
+when this variable points at the library (`init_non_native_support()` in
 `dlls/ntdll/unix/loader.c`). CrossOver's launcher sets it on every run; nothing else does.
 
-Blizzard's protected loader `diablo_iv_loader.dll` generates code at runtime and drives it
-with fibers plus `SetThreadContext` on other threads. Without the registration the fiber
-switch does not return where the loader expects, its scheduler loop re-enters, and it
-deadlocks re-acquiring its own non-recursive SRW lock. What you see is 0.0% CPU, 122 MB
-resident, nine threads, no window, and **not one byte** in the game's own
-`_FenrisDebug-*.txt`. Nothing in that picture points at Rosetta.
+Blizzard's protected loader `diablo_iv_loader.dll` generates code at runtime and drives it with
+fibers plus `SetThreadContext` on other threads. Without the registration the fiber switch does
+not return where the loader expects, its scheduler loop re-enters, and it deadlocks
+re-acquiring its own non-recursive SRW lock. What you see is 0.0% CPU, 122 MB resident, nine
+threads, no window, and **not one byte** in the game's own `_FenrisDebug-*.txt`. Nothing in that
+picture points at Rosetta (prototype).
 
 The 32-bit client is structurally unaffected: `pe_module_loaded()` reaches
 `init_non_native_support()` only on the 64-bit side, because the WoW64 entry point
 `wow64_pe_module_loaded()` is a stub returning `STATUS_NOT_IMPLEMENTED`.
 
-**Also place `libd3dshared.dylib` in the same directory as `D3DMetal.framework`.**
-`d3d12.so` declares `LC_RPATH = @loader_path` and looks for `libd3dshared.dylib` beside
-itself; `libd3dshared` then `dlopen`s `@rpath/D3DMetal.framework/D3DMetal` relative to *its*
-own location. Copying only `libd3dshared` next to the `.so` files breaks it.
+**`libd3dshared.dylib` goes in the same directory as `D3DMetal.framework`.** `d3d12.so` declares
+`LC_RPATH = @loader_path` and looks for `libd3dshared.dylib` beside itself; `libd3dshared` then
+`dlopen`s `@rpath/D3DMetal.framework/D3DMetal` relative to *its* own location. Copying only
+`libd3dshared` next to the `.so` files breaks it.
 
-sake does this on 2026-09-19: it copies `libd3dshared.dylib` into
-`lib/wine/x86_64-unix/` and puts a `D3DMetal.framework` symlink beside it pointing at
-`../../external/D3DMetal.framework`, then refuses to call the install done unless
-`lib/wine/x86_64-unix/D3DMetal.framework/D3DMetal` resolves. The engine that comes out has
-`d3d12.so` linking `@rpath/libd3dshared.dylib` and that symlink landing on a real x86_64
-Mach-O. **Nothing has been run against it.**
+So sake copies `libd3dshared.dylib` into `lib/wine/x86_64-unix/`, puts a `D3DMetal.framework`
+symlink beside it pointing at `../../external/D3DMetal.framework`, and refuses to call the
+install done unless `lib/wine/x86_64-unix/D3DMetal.framework/D3DMetal` resolves. The engine that
+comes out has `d3d12.so` linking `@rpath/libd3dshared.dylib` and that symlink landing on a real
+x86_64 Mach-O (sake, 2026-09-19). In Diablo IV on this engine, Metal's HUD names
+`Game Porting Toolkit 4.0b2` (sake, 2026-09-21).
 
 ### Everything else belongs to one title
 
-The three above are sake's, and `Bottle.environment` puts them on everything the engine
-runs. Anything else is one title's business, and since 2026-09-21 a title carries its own
-`KEY=VALUE` pairs. They go in underneath the bottle's, which is composed afterwards, so the
-five names `Bottle.environment` writes — `WINEPREFIX`, `WINEDLLOVERRIDES`, `WINEDEBUG`,
-`WINE_SIMULATE_WRITECOPY` and `CX_APPLEGPTK_LIBD3DSHARED_PATH` — win. The sheet refuses
-those by name rather than accepting a value it would then quietly ignore, because a run that
-behaves as though a variable had been set is the worse of the two failures.
+The two variables above are sake's, and `Bottle.environment` puts them on everything the engine
+runs. Anything else is one title's business, and a title carries its own `KEY=VALUE` pairs.
+They go in underneath the bottle's, which is composed afterwards, so the five names
+`Bottle.environment` writes — `WINEPREFIX`, `WINEDLLOVERRIDES`, `WINEDEBUG`,
+`WINE_SIMULATE_WRITECOPY` and `CX_APPLEGPTK_LIBD3DSHARED_PATH` — win. The sheet refuses those by
+name rather than accepting a value it would then quietly ignore, because a run that behaves as
+though a variable had been set is the worse of the two failures.
 
-**`MTL_HUD_ENABLED=1` draws Metal's performance HUD, and D3DMetal adds a section of its
-own to it.** The HUD belongs to the OS, so anything rendering through Metal can show it;
-what makes it worth knowing here is that block. Measured in Diablo IV on sake's own
-engine, 2026-09-21: above an FPS and GPU-time graph the HUD names the translation
-`D3D12 (Metal 4)` and the process `x86_64`, and below it lists
-`Game Porting Toolkit 4.0b2` with Dispatch, Draw, Clear Resource, Copy Resource and
-ExecuteIndirect counts. It is the cheapest look at what D3DMetal is doing per frame, and
-it costs no trace.
+**`MTL_HUD_ENABLED=1` draws Metal's performance HUD, and D3DMetal adds a section of its own to
+it.** The HUD belongs to the OS, so anything rendering through Metal can show it; what makes it
+worth knowing here is that block. In Diablo IV on sake's own engine, above an FPS and GPU-time
+graph the HUD names the translation `D3D12 (Metal 4)` and the process `x86_64`, and below it
+lists `Game Porting Toolkit 4.0b2` with Dispatch, Draw, Clear Resource, Copy Resource and
+ExecuteIndirect counts (sake, 2026-09-21). It is the cheapest look at what D3DMetal is doing per
+frame, and it costs no trace.
 
-The prototype lists this variable among the ones that made no difference. That is about
-the hang it was tested against, not about the HUD: it did not fix the hang, and it does
-draw.
+The prototype lists this variable among the ones that made no difference. That is about the
+hang it was tested against, not about the HUD: it did not fix the hang, and it does draw.
 
-## Starting a title
+## Starting and recognising a title
 
-From the game's own directory, by its bare leaf name, with the title's arguments. sake did
-this for the first time on 2026-09-19; a healthy Battle.net run looks like this in
-`ps -Ao pid=,args=`:
+**A title starts from the game's own directory, by its bare leaf name, with the title's
+arguments.** A healthy Battle.net run looks like this in `ps -Ao pid=,args=` (sake,
+2026-09-19):
 
 ```
 start.exe /exec Battle.net.exe --use-gl=angle --use-angle=vulkan
@@ -185,68 +187,63 @@ C:/ProgramData/Battle.net/Agent/Agent.9775/Agent.exe --session=…
 
 Three things in that list defeat a naive process check:
 
-- **`wine` turns a relative name into `start.exe /exec`.** sake's own launch therefore
-  appears as `start.exe`, never as the game. That is precisely the case the "cut `argv[0]`
-  at its first `.exe`" rule exists for, and it drops out as intended.
+- **`wine` turns a relative name into `start.exe /exec`.** sake's own launch therefore appears
+  as `start.exe`, never as the game, which is the case the rule below exists for.
 - **wineserver does not spell itself `<engine>/bin/wineserver`.** `ps` shows
   `<engine>/lib/wine/../../bin/wineserver`. A teardown check matching the tidy path matches
-  nothing and so reports success every time — sake's first version did exactly that, and
-  only a real run showed it.
-- **`--in-process-gpu` does not mean one process.** It folds the GPU into the browser
-  process; the renderer and the two utility processes remain their own. Four
-  `Battle.net.exe` is what a healthy run has.
+  nothing and so reports success every time — sake's first version did exactly that, and only a
+  real run showed it.
+- **`--in-process-gpu` does not mean one process.** It folds the GPU into the browser process;
+  the renderer and the two utility processes remain their own. Four `Battle.net.exe` is what a
+  healthy run has.
 
-What the client's own logs said on that run is the evidence the settings above did their
-job: `libcef-*.log` held two `WSALookupServiceBegin failed` lines and nothing else — no GPU
-errors, no "GL is disabled" — and `battle.net-*.log` ended
-`UAuth: finished loading. statusCode=200 state=Login`.
+**The game's process is the one whose `argv[0]` ends with the executable's name**, not one that
+contains it: a loose match also catches `cmd.exe`, `start.exe` or any launcher carrying the name
+in its own arguments, which handed the prototype the wrong process twice. Matching the bare name
+at the start is not enough either, because `argv[0]` is spelled differently depending on how the
+program was started. So sake cuts `argv[0]` at its first `.exe` and checks what that ends with.
 
-**Nobody looked at the screen.** This was measured without screen access, so "the login form
-is visible" is not claimed. What is claimed is that the page was requested, came back 200,
-and the renderer that draws it was still alive seventy-five seconds later.
+What the client's own logs said on that run is the evidence the settings did their job:
+`libcef-*.log` held two `WSALookupServiceBegin failed` lines and nothing else — no GPU errors, no
+"GL is disabled" — and `battle.net-*.log` ended
+`UAuth: finished loading. statusCode=200 state=Login`, and the renderer that draws the page was
+still alive seventy-five seconds later (sake, 2026-09-19). The login form was
+seen, the client signed in, and Play started Diablo IV, which was played (the owner's report,
+2026-09-20).
 
-## Two patches to ntdll
+## Diablo IV: two ntdll patches and the Play button
 
-sake carries nine patches in `patches/`, all LGPL-2.1-or-later because all are derivatives
-of Wine. Two of the three in ntdll are this section's; they came from the prototype unchanged
-and go in before configure. The four in winemac.drv arrived with Steam on 2026-09-20 and are
-in the Steam section below, the two in winhttp arrived with Minecraft Dungeons II on
-2026-09-29 and are in the GDK section after it, and the third in ntdll came with the same
-game a day later and has the exFAT section after that. The build side of patching is in
-`wine-build.md` and the licence side in `licensing.md`.
+*Both patches came from the prototype unchanged and go in before configure. sake measured both
+against its own engine and bottle on 2026-09-19, the day it started carrying them; the
+prototype's numbers are kept as the before-the-patch half, which sake has not reproduced,
+because its engine has never been built without them.*
 
-**sake measured both on 2026-09-19**, against its own engine and bottle, the day it started
-carrying them. The prototype's numbers are kept beside sake's because they are the
-before-the-patch half, and sake has not reproduced that half — its engine has never been
-built without them.
+### 0001: find libd3dshared without the variable
 
-**Resolve `libd3dshared` from `dll_dir` when the variable is unset.** A process whose
-environment was composed by an application never inherits the variable. The prototype
-measured, with the variable removed: before the patch 122 MB at 0.0% CPU with nine threads
-(deadlocked), after it 2561 MB at 38.6% CPU with 84 threads (running). The variable still
-wins when set.
+**`patches/0001` resolves `libd3dshared` from `dll_dir` when `CX_APPLEGPTK_LIBD3DSHARED_PATH` is
+unset**, because a process whose environment an application composed never inherits the
+variable. The variable still wins when set.
 
-sake's own measurement looks at what is mapped rather than at CPU. With the variable removed
-from the environment, Diablo IV came up at 83 threads and 2534 MB with
-`<engine>/lib/external/libd3dshared.dylib` mapped into it, seven regions. An unpatched ntdll
-returns before that `dlopen` when the variable is unset, so the library being in the process
-at all is the patch and nothing else.
+With the variable removed, before the patch: 122 MB at 0.0% CPU with nine threads, deadlocked;
+after it, 2561 MB at 38.6% CPU with 84 threads, running (prototype). sake's measurement looks at
+what is mapped rather than at CPU: with the variable removed from the environment, Diablo IV
+came up at 83 threads and 2534 MB with `<engine>/lib/external/libd3dshared.dylib` mapped into
+it, seven regions. An unpatched ntdll returns before that `dlopen` when the variable is unset,
+so the library being in the process at all is the patch and nothing else (sake, 2026-09-19).
+`vmmap` is how to see it, not `WINEDEBUG=+module`
+([debugging.md](debugging.md#looking-from-the-mac-side)).
 
-**`vmmap` is how to check this, not `WINEDEBUG=+module`.** The two `TRACE`s in
-`init_non_native_support` only run once something calls `pe_module_loaded`, which a
-`wine cmd /c exit` never does — and during a real game start they did not reach a filter on
-wine's own stderr either. Two attempts went that way before the mapping was looked at
-instead, which took one command.
+### 0002: read BOOLEAN syscall arguments as Windows defines them
 
-**Read `BOOLEAN` syscall arguments as the Windows ABI defines them.** This is the one that
-made the Play button work, and it is worth understanding before touching ntdll.
+**`patches/0002` is the one that made the Play button work**, and it is worth understanding
+before touching ntdll.
 
-Since Diablo IV 3.1.0 (2026-06-30) the loader inspects the process that started it, when
-that process is still alive — and `Agent.exe` always is. It opens the parent, reads its
-image path, and walks `\DosDevices` one entry at a time with `NtQueryDirectoryObject` to
-build a drive-letter-to-device map. CrossOver's build asks for index 0, 1, 2 … 48 and
-finishes. The prototype's asked for **index 0 on every call, ~55,000 times a second,
-forever** — its `+server` log grew at 17 MB/s, which is how the loop was found.
+Since Diablo IV 3.1.0 (2026-06-30) the loader inspects the process that started it, when that
+process is still alive — and `Agent.exe` always is. It opens the parent, reads its image path,
+and walks `\DosDevices` one entry at a time with `NtQueryDirectoryObject` to build a
+drive-letter-to-device map. CrossOver's build asks for index 0, 1, 2 … 48 and finishes. The
+prototype's asked for **index 0 on every call, ~55,000 times a second, forever** — its `+server`
+log grew at 17 MB/s, which is how the loop was found.
 
 `WINEDEBUG=+syscall` showed the fifth argument, `RestartScan`, a stack-passed `BOOLEAN`:
 
@@ -255,135 +252,131 @@ forever** — its `+server` log grew at 17 MB/s, which is how the loop was found
 | the prototype | `6c006200610000` — UTF-16 `abl`, leftover from a path string |
 | CrossOver | `00000000` |
 
-The low byte is FALSE in both. The Windows x64 ABI leaves the upper bits of a narrow
-argument undefined and MSVC stores exactly one byte, so the caller is within its rights.
+The low byte is FALSE in both. The Windows x64 ABI leaves the upper bits of a narrow argument
+undefined and MSVC stores exactly one byte, so the caller is within its rights.
 `__wine_syscall_dispatcher` copies the whole 8-byte word into the SysV register, and the
 clang-built unix side assumes — as the SysV ABI permits — that a narrow parameter arrives
 zero-extended, compiling the test to `testl %r8d, %r8d`. Non-zero garbage above the low byte
 therefore reads as TRUE and the enumeration restarts forever.
 
-The fix adds an empty asm barrier that makes the compiler forget the zero-extension
-assumption, and applies it to both `BOOLEAN` parameters of `NtQueryDirectoryObject` only,
-because that is the call that was measured. **The same exposure exists in
-`NtQueryDirectoryFile`, `NtQueryEaFile`, `NtSetTimer`, `NtLockFile`,
-`NtNotifyChangeDirectoryFile`, `NtNotifyChangeKey` and `NtCreateEvent`** — Wine's own PE DLLs
-are their usual callers and keep the slot clean, so nothing has been seen to need it.
+The fix adds an empty asm barrier that makes the compiler forget the zero-extension assumption,
+and applies it to both `BOOLEAN` parameters of `NtQueryDirectoryObject` only, because that is
+the call that was measured. **The same exposure exists in `NtQueryDirectoryFile`,
+`NtQueryEaFile`, `NtSetTimer`, `NtLockFile`, `NtNotifyChangeDirectoryFile`, `NtNotifyChangeKey`
+and `NtCreateEvent`** — Wine's own PE DLLs are their usual callers and keep the slot clean, so
+nothing has been seen to need it.
 
 Two things this is *not*:
 
 - **Not a CrossOver-only correctness win.** CrossOver's `ntdll.so` has the identical
-  `testl %r8d, %r8d`. It passes because its GCC/binutils-built PE DLLs leave zeros in that
-  slot. That reading is inference, not measurement; what was measured is the zero in their
-  trace and the string in ours. Either way it is a latent bug in every clang-built Wine.
-- **Not Valve's Proton Hotfix.** ValveSoftware/Proton #9926 is a different failure on Linux
-  (an exit on a breakpoint before any renderer init). A GCC-built unix side cannot hit this
-  bug.
+  `testl %r8d, %r8d`. It passes because its GCC/binutils-built PE DLLs leave zeros in that slot.
+  That reading is inference, not measurement; what was measured is the zero in their trace and
+  the string in ours. Either way it is a latent bug in every clang-built Wine.
+- **Not Valve's Proton Hotfix.** ValveSoftware/Proton #9926 is a different failure on Linux (an
+  exit on a breakpoint before any renderer init). A GCC-built unix side cannot hit this bug.
 
-sake measured this one with the prototype's probe shape — `start.exe /exec` keeps a Windows
-parent alive exactly as `Agent.exe` does, which reproduces the check in half a minute with
-no client and no mouse. Against sake's own engine and bottle: peak 92 threads, 1982 MB, 103
-Metal/AGX mappings, still alive when the sampling ended. The stall this replaces sits flat
-at 12-13 threads and 235-245 MB for as long as anyone cares to watch, so there is no reading
-of those numbers that confuses the two.
+sake measured it with the prototype's probe shape: `start.exe /exec` keeps a Windows parent
+alive exactly as `Agent.exe` does, which reproduces the check in half a minute with no client
+and no mouse. Against sake's own engine and bottle: peak 92 threads, 1982 MB, 103 Metal/AGX
+mappings, still alive when the sampling ended (sake, 2026-09-19). The stall this replaces sits
+flat at 12-13 threads and 235-245 MB for as long as anyone cares to watch, so there is no reading
+of those numbers that confuses the two. Play itself was pressed the next day, and the game was
+played (the owner's report, 2026-09-20).
 
-**That is the check cleared, not the button pressed.** Nobody has pressed Play on sake's
-build; what has been shown is that the thing the button trips over no longer stalls.
-
-## SSO: pressing Play does two separable things
+### Pressing Play does two separable things
 
 1. **The client becomes willing to hand out a token.** Launching the game directly without a
-   press earlier in the same client session gets it all the way up — rendering, intro
-   playing — and then `Aurora has rejected the token`, *"There was a problem logging in.
-   (Code 7)"*. Measured in one session: manual launch at 02:13 got Code 7, Play pressed at
-   02:48, manual launch at 02:52 logged in and reached character select.
-2. **`Agent.exe` starts the game.** This is the part the BOOLEAN bug broke.
+   press earlier in the same client session gets it all the way up — rendering, intro playing —
+   and then `Aurora has rejected the token`, *"There was a problem logging in. (Code 7)"*. In one
+   session: a manual launch at 02:13 got Code 7, Play was pressed at 02:48, and a manual launch
+   at 02:52 logged in and reached character select (prototype).
+2. **`Agent.exe` starts the game.** This is the part the `BOOLEAN` bug broke.
 
-The client logs `Pre-existing game session detected without a pending launch` for every
-manual start **including the ones that log in perfectly**, so that message says nothing
-about the token.
+The client logs `Pre-existing game session detected without a pending launch` for every manual
+start, **including the ones that log in perfectly**, so that message says nothing about the
+token.
 
-Implication for sake: a "launch the game directly" button cannot work for this title on its
-own. The launcher's own flow has to be driven at least once per session.
+So a "launch the game directly" button cannot work for this title on its own: the launcher's own
+flow has to be driven at least once per session. sake offers no such button, and nothing in it
+knows that a title naming the game's own executable will fail this way.
 
-**There is a third way in that nobody here has tried.** Blizzard installs its own
-`Diablo IV Launcher.exe` beside the game, and the desktop shortcut the installer leaves
-points at that with no arguments at all — read out of
-`drive_c/users/Public/Desktop/Diablo IV.lnk` on 2026-09-21, 250 bytes, target and working
-directory and nothing else. So "start Diablo IV" as a title in sake need not mean starting
-`Diablo IV.exe`: it can mean starting the launcher Blizzard ships, which talks to the
-client the way the Play button does. **Untested** — the shortcut was read, not run.
+**A third way in has not been tried.** Blizzard installs its own `Diablo IV Launcher.exe` beside
+the game, and the desktop shortcut the installer leaves points at it with no arguments at all:
+`drive_c/users/Public/Desktop/Diablo IV.lnk`, 250 bytes, target and working directory and
+nothing else (read, 2026-09-21). So a Diablo IV title need not mean starting
+`Diablo IV.exe`: it can start the launcher Blizzard ships, which talks to the client the way the
+Play button does. **Untested**: the shortcut was read, not run.
 
 ## Controllers need SDL2
 
-`winebus.sys` has two backends. **IOHID** is built either way and handles anything behaving
-as a plain HID gamepad. **SDL** is compiled in only if configure found SDL2, and it is the
-one that knows device-specific protocols.
-
-A Nintendo Switch Pro Controller needs the second: it enumerates as a HID device with a
-reasonable descriptor and then sends **no input reports at all** until it has been through
-Nintendo's handshake, which lives in SDL's HIDAPI driver. An IOHID-only build gives a
-controller that is plugged in, visible to macOS, and completely dead in the game.
-
-Verified by playing the game with a Switch Pro Controller over USB, 2026-09-17.
-
-**The same controller and cable played Diablo IV through sake on 2026-09-20.** Reported by
-the owner, not instrumented — there is no log of that run. What it settles is that the SDL2
-requirement above carries over to sake's own engine and bottle; it is not new evidence about
-the driver.
-
-**And over Bluetooth on 2026-09-21** — the same pad, no cable, played in the game. The owner's
-report again, which is what takes "Bluetooth is untested" off this section. Other pads are
-still untested.
-
-**That pad is an 8BitDo Ultimate 2 Bluetooth Controller**, not Nintendo hardware: it claims
-Nintendo's own ids, `Vendor 0x057E / Product 0x2009`, and macOS lists it as `Pro Controller`.
-Read here from `system_profiler SPBluetoothDataType`, 2026-09-21. So "Switch Pro Controller"
-above is the identity the pad presents rather than who built it — and that identity is the
-thing that matters, because the ids are what send it down SDL's Switch driver and Nintendo's
-handshake.
+**Wine has to be built with SDL2, or a Switch-style pad is dead in the game.** `winebus.sys`
+has two backends. IOHID is always built and handles pads that behave as plain HID gamepads.
+SDL is built only when configure finds SDL2, and it knows device-specific protocols. A pad
+that presents itself as a Switch Pro Controller enumerates as a HID device with a reasonable
+descriptor and then sends no input at all until it has been through Nintendo's handshake,
+which lives in SDL's HIDAPI driver — so an IOHID-only build gives a pad that macOS sees and the
+game does not.
 
 Use SDL2 newer than CrossOver's 2.30.12: 2.32.2 fixed a crash initialising with controllers
-already connected on macOS, 2.32.6 fixed reliability of initializing Switch controllers on
-macOS, and 2.32.10 fixed thumbstick range and calibration for Switch Pro Controllers by
-name. If a pad misbehaves, 2.30.12 is the version known-good under CrossOver and the right
-thing to bisect against. Not SDL3 — Wine looks for pkg-config's `sdl2` and `SDL_Init` in
-`libSDL2-2.0*`.
+already connected on macOS, 2.32.6 made Switch controllers initialise reliably on macOS, and
+2.32.10 fixed thumbstick range and calibration for Switch Pro Controllers. If a pad
+misbehaves, 2.30.12 is the version known to work under CrossOver and the one to bisect
+against. Not SDL3: Wine looks for pkg-config's `sdl2` and `SDL_Init` in `libSDL2-2.0*`.
 
-## Steam: the client draws in one process and owns its window in another
+One pad has been played with: an 8BitDo Ultimate 2, which presents itself as Nintendo's
+`057E:2009` and which macOS lists as `Pro Controller` (read with
+`system_profiler SPBluetoothDataType`, 2026-09-21). That identity is what matters: the ids are
+what send it down SDL's Switch driver and Nintendo's handshake. It played Diablo IV:
 
-Measured in sake on 2026-09-20 against the default bottle, with Steam's 64-bit client (build
-1788652215) installed through the app and the engine built from CrossOver 26.3.0's sources
-with D3DMetal 4.0b2: thirteen starts, seven of them traced, six windows photographed.
-Everything in this section is sake's own measurement.
+| where | connection | how it is known |
+|---|---|---|
+| the prototype | USB | played, 2026-09-17 |
+| sake | USB | the owner's report, 2026-09-20 |
+| sake | Bluetooth | the owner's report, 2026-09-21 |
 
-**What a start looked like.** The client comes up as a 700×440 window called "Sign in to
-Steam" that is black to the last pixel — captured by window id on three starts, 1400×880
-pixels at 2×, 100.00% black, one colour. Steam's `cef_log.txt` says why: `GPU process exited
-unexpectedly: exit_code=-1073741819` three times per webhelper, Steam restarting the webhelper
-once, then `Disabling GPU acceleration: Disabled/CrashCount` and a SwiftShader GPU process
-compositing in software, into the same black.
+The sake rows are reports rather than traces: they show the SDL2 requirement carries over to
+sake's own engine and bottle, and are not new evidence about the driver. Other pads have not
+been tried.
+
+## Steam: one process draws, another owns the window
+
+**Steam's client needs `patches/0003` to `0006`: without them its window is black on every
+start, whatever flags it is given.** The client's browser process owns the window and its GPU
+process draws into it, and the winemac.drv in CrossOver 26.3.0's Wine 11.0 has no way to carry
+rendering across that line. With the patches a start with no arguments works, and Steam needs
+nothing per-title: no flags, no environment, no registry.
+
+*Measured in sake on 2026-09-20 against the default bottle, with Steam's 64-bit client (build
+1788652215) installed through the app and the engine built from CrossOver 26.3.0's sources with
+D3DMetal 4.0b2: thirteen starts, seven of them traced, six windows photographed.*
+
+**What a start looked like.** The client comes up as a 700×440 window called "Sign in to Steam"
+that is black to the last pixel — captured by window id on three starts, 1400×880 pixels at 2×,
+100.00% black, one colour. Steam's `cef_log.txt` says why: `GPU process exited unexpectedly:
+exit_code=-1073741819` three times per webhelper, Steam restarting the webhelper once, then
+`Disabling GPU acceleration: Disabled/CrashCount` and a SwiftShader GPU process compositing in
+software, into the same black.
 
 **Who owns what.** `WINEDEBUG=+pid,+win` shows the browser process of steamwebhelper creating
 every window the client shows: an `SDL_app` top-level, a `CefBrowserWindow` inside it, a
 `Chrome_WidgetWin_1` inside that (700×440, the compositor's target) and a
-`Chrome_RenderWidgetHostHWND`. The GPU process, `steamwebhelper.exe --type=gpu-process`,
-creates no window at all, and `steam.exe` holds only its bootstrap and tray helpers. The
-swapchain is therefore asked for by one process on a window another process owns.
+`Chrome_RenderWidgetHostHWND`. The GPU process, `steamwebhelper.exe --type=gpu-process`, creates
+no window at all, and `steam.exe` holds only its bootstrap and tray helpers. The swapchain is
+therefore asked for by one process on a window another process owns.
 
 **Where it died.** On the `macdrv_d3dmtl` channel the GPU process makes exactly one hook call,
-`get_win_data 0x…`, and the next line is `c0000005` reading address `0x18`, repeated 255
-times as the crash handler re-faulted. winemac.drv keeps its window records per process, so
+`get_win_data 0x…`, and the next line is `c0000005` reading address `0x18`, repeated 255 times as
+the crash handler re-faulted. winemac.drv keeps its window records per process, so
 `get_win_data` returned NULL for the browser's window; `0x18` is `client_cocoa_view` in the
 record D3DMetal expects; and `vmmap` on a live GPU process put the faulting `rip` inside
 `libd3dshared.dylib`, whose `WineSwapchainCallbacks::InitializeForHWND` reads that field
-straight after the call — `movq 0x18(%rcx), %rcx`, with no check for NULL. The 254 faults
-after the first are `RtlVirtualUnwind2` writing to a NULL out-parameter while unwinding
-through the shim's unix-side frame: Wine cannot dispatch an exception raised inside a dylib
-the PE side called into, so crashpad never writes its dump and the process exits with the
-exception code.
+straight after the call — `movq 0x18(%rcx), %rcx`, with no check for NULL. The 254 faults after
+the first are `RtlVirtualUnwind2` writing to a NULL out-parameter while unwinding through the
+shim's unix-side frame: Wine cannot dispatch an exception raised inside a dylib the PE side
+called into, so crashpad never writes its dump and the process exits with the exception code.
 
-**No flag reaches it.** The `--use-gl=angle --use-angle=vulkan --in-process-gpu` the title
-had been given are consumed by `steam.exe` and never appear on the webhelper's command line;
+**No flag reaches it.** The `--use-gl=angle --use-angle=vulkan --in-process-gpu` the title had
+been given are consumed by `steam.exe` and never appear on the webhelper's command line;
 `webhelper.txt` prints that line. Steam's own switches live in `steamclient64.dll`, not
 `steam.exe` — `strings` on the exe finds seven and misleads — and this build has 45 `-cef-*`
 options. What each relevant one did, 45 seconds per start, window captured by id:
@@ -396,74 +389,72 @@ options. What each relevant one did, 45 seconds per start, window captured by id
 | `-cef-disable-gpu` | lives; SwiftShader | black, the same path |
 | `-cef-disable-browser-underlays`, `D3DM_NO_WINDOW=1` | no change | no change |
 
-`-cef-in-process-gpu` and `-cef-single-process`, which would have made this one process the
-way `--in-process-gpu` does for Battle.net, are no longer in the binary.
+`-cef-in-process-gpu` and `-cef-single-process`, which would have made this one process the way
+`--in-process-gpu` does for Battle.net, are no longer in the binary.
 
 **The fix is in the driver**, as four patches in `patches/`, each with its history in its
-header. Upstream Wine's `52e03c61` and `1a63b0d7` (both by CodeWeavers, merged for
-wine-11.11) give a process a Metal swapchain for a top-level window another process owns:
-the layer is exported through a `CAContext` and the owner hosts it in its window with a
-`CALayerHost`. The reference implementation attached to Wine bug 60263 takes that to child
-windows, posting the context to the child's root and keeping the hosted layer at the child's
-rectangle. sake's own change is to `d3dmetal.c`: D3DMetal's `get_win_data` for a window this
-process does not own now gets a record whose view leads to that hosted swapchain, where it
-used to get NULL. The view has to be a real `NSView`: the first attempt handed D3DMetal the
-client surface itself and it died in `objc_msgSend_stret`, asking that pointer for its
-bounds — the patch header has the register dump.
+header. Upstream Wine's `52e03c61` and `1a63b0d7` (both by CodeWeavers, merged for wine-11.11)
+give a process a Metal swapchain for a top-level window another process owns: the layer is
+exported through a `CAContext` and the owner hosts it in its window with a `CALayerHost`. The
+reference implementation attached to Wine bug 60263 takes that to child windows, posting the
+context to the child's root and keeping the hosted layer at the child's rectangle. sake's own
+change is to `d3dmetal.c`: D3DMetal's `get_win_data` for a window this process does not own now
+gets a record whose view leads to that hosted swapchain, where it used to get NULL. The view has
+to be a real `NSView`: the first attempt handed D3DMetal the client surface itself and it died
+in `objc_msgSend_stret`, asking that pointer for its bounds — the patch header has the register
+dump.
 
-**On the rebuilt engine, the same day, a start with no arguments works.** No `c0000005` in
-any process. The GPU process makes all six glue calls and they read, on `+macdrv_d3dmtl`,
-`get_win_data 0x20112` → `remote_win_data window 0x20112 of another process: view … rect
-(0,0)-(700,440)` → `create_metal_device` → `view_create_metal_view … hosted swapchain …,
-view …` → `view_get_metal_layer` → `release_win_data`; `+msg` shows it posting message
-`80001002` to the browser's root, and the browser logs `WM_MACDRV_CREATE_REMOTE_LAYER child
-0x20112 context_id 706998962` on receipt. Steam's GPU report stays `ANGLE_D3D11` with
-`gpu_compositing: enabled`, one GPU process for the whole run. The window, 45 seconds in:
-0.00% black over 1400×880 pixels, 142 colours in a sample, and the sign-in form — logo,
-account name, password, Sign in, the QR code — legible in the capture. Thirty seconds in it
-was 630×397 with the desktop showing through, so the first frame arrives some seconds after
-the layer host does. Nobody had signed in yet when this was written.
+**On the rebuilt engine a start with no arguments works.** No `c0000005` in any process. The GPU
+process makes all six glue calls and they read, on `+macdrv_d3dmtl`, `get_win_data 0x20112` →
+`remote_win_data window 0x20112 of another process: view … rect (0,0)-(700,440)` →
+`create_metal_device` → `view_create_metal_view … hosted swapchain …, view …` →
+`view_get_metal_layer` → `release_win_data`; `+msg` shows it posting message `80001002` to the
+browser's root, and the browser logs `WM_MACDRV_CREATE_REMOTE_LAYER child 0x20112 context_id
+706998962` on receipt. Steam's GPU report stays `ANGLE_D3D11` with `gpu_compositing: enabled`,
+one GPU process for the whole run. The window, 45 seconds in: 0.00% black over 1400×880 pixels,
+142 colours in a sample, and the sign-in form — logo, account name, password, Sign in, the QR
+code — legible in the capture. Thirty seconds in it was 630×397 with the desktop showing
+through, so the first frame arrives some seconds after the layer host does. A window hosting
+another process's layer cannot be captured by id, so this one was photographed another way
+([debugging.md](debugging.md#looking-from-the-mac-side)).
 
-One instrument changed with the fix: `screencapture -l <id>` on a window that hosts another
-process's layer fails with "could not create image from window", where the black windows
-captured fine. The capture above is a full-screen shot taken with the window raised for a
-second and cropped to its bounds. The Vulkan route (`-cef-use-vulkan`) is still black on the
-rebuilt engine, for the reason in the table: its swapchain is on a window the GPU process
-owns under a root it does not, and nothing hosts that shape yet.
+The Vulkan route (`-cef-use-vulkan`) is still black on the rebuilt engine, for the reason in the
+table: its swapchain is on a window the GPU process owns under a root it does not, and nothing
+hosts that shape yet.
 
-**Signed in, and a game ran, later the same day.** The client took an account, the library
-came up, and Stardew Valley installed through it and played. Reported by the owner, not
-instrumented: nothing traced that run, and the measurements above all stop at the sign-in
-form. 2026-09-20.
+**The client then signed in, and a game ran**: an account was taken, the library came up, and
+Stardew Valley installed through it and played. Nothing traced that run, and the measurements
+above stop at the sign-in form (the owner's report, 2026-09-20).
 
-## GDK titles: XCurl drops a request when WinHTTP refuses an option
+## GDK titles: WinHTTP options XCurl cannot do without
 
-Measured in sake on 2026-09-29 in the `ex` bottle, with Minecraft Dungeons II started through
-Steam. The title is built on Microsoft's GDK and needs Xbox Gaming Services, which Wine does
-not have, so a community stand-in DLL was in its place throughout. The GDK's HTTP client,
-XCurl, runs over WinHTTP.
+**`patches/0007` and `0008` accept two WinHTTP options Wine 11.0 does not know; without them a
+GDK title's HTTP client drops a request before sending it.** XCurl, the GDK's HTTP client, runs
+over WinHTTP and abandons a request when an option it sets is refused, so `LoginWithSteam` never
+reaches PlayFab and Minecraft Dungeons II shows LOG IN FAILED, error 0063.
+
+*Measured in sake on 2026-09-29 in the `ex` bottle, with Minecraft Dungeons II started through
+Steam. The title needs Xbox Gaming Services, which Wine does not have, so a community stand-in
+DLL was in its place throughout.*
 
 **Two of the options XCurl sets do not exist in Wine 11.0.** The options at the eleven
-`WinHttpSetOption` call sites in `XCurl.dll`, read with the engine toolchain's
-`llvm-objdump`, were set one at a time from a small exe against CrossOver 26.3.0's WinHTTP,
-with no request sent. Two fail, both with `ERROR_WINHTTP_INVALID_OPTION` (12009), because
-`session.c` has no case for either: `WINHTTP_OPTION_IPV6_FAST_FALLBACK` (140), set on the
-session, and `WINHTTP_OPTION_DECOMPRESSION` (118), set on each request as soon as it is
-opened.
+`WinHttpSetOption` call sites in `XCurl.dll`, read with the engine toolchain's `llvm-objdump`,
+were set one at a time from a small exe against CrossOver 26.3.0's WinHTTP, with no request
+sent. Two fail, both with `ERROR_WINHTTP_INVALID_OPTION` (12009), because `session.c` has no case
+for either: `WINHTTP_OPTION_IPV6_FAST_FALLBACK` (140), set on the session, and
+`WINHTTP_OPTION_DECOMPRESSION` (118), set on each request as soon as it is opened.
 
-**A refusal ends the request before it is sent.** For 118, XCurl reads the error and
-abandons the request, so `LoginWithSteam` never reaches PlayFab and the game shows LOG IN
-FAILED, error 0063. Refusing 140 alone does the same: with the stand-in's own answer to it
-removed and 118 still answered, the game showed the same error, and the stand-in logged 140
-refused 25 times and not one connection made.
+**A refusal ends the request before it is sent.** For 118, XCurl reads the error and abandons
+the request. Refusing 140 alone does the same: with the stand-in's own answer to it removed and
+118 still answered, the game showed the same error, and the stand-in logged 140 refused 25 times
+and not one connection made.
 
 **Upstream stubbed both, and sake carries the two commits** until CrossOver's sources contain
 them: `patches/0007` is Paul Gofman's for 118, from wine-11.4, and `patches/0008` is Hans
-Leidekker's for 140, from wine-11.7. Each accepts the option, prints a `FIXME` and does
-nothing else. For 118 that is enough, because the `Accept-Encoding` header is WinHTTP's to
-add -- `XCurl.dll` holds no such string, in ASCII or UTF-16 -- so nothing asks the server to
-compress. wine-11.5 replaced the 118 stub with real gzip and deflate support, which sake
-does not carry.
+Leidekker's for 140, from wine-11.7. Each accepts the option, prints a `FIXME` and does nothing
+else. For 118 that is enough, because the `Accept-Encoding` header is WinHTTP's to add —
+`XCurl.dll` holds no such string, in ASCII or UTF-16 — so nothing asks the server to compress.
+wine-11.5 replaced the 118 stub with real gzip and deflate support, which sake does not carry.
 
 **How to tell it worked.** The same exe on the patched engine gets `TRUE` for both, and with
 `WINEDEBUG` at its default prints the two lines below, where the unpatched engine printed
@@ -475,91 +466,92 @@ fixme:winhttp:set_option WINHTTP_OPTION_DECOMPRESSION, 0x3 stub.
 ```
 
 sake starts titles with `WINEDEBUG=-all`, so a title's log never shows them; the tell in the
-game is the sign-in going through with both of the stand-in's hooks removed, which it did on
-the rebuilt engine: Microsoft's sign-in, then `LoginWithSteam`, then character select, with
-every reply the stand-in logged, 20 of them, a 200 and no option refused.
+game is the sign-in going through with both of the stand-in's hooks removed, which it did on the
+rebuilt engine: Microsoft's sign-in, then `LoginWithSteam`, then character select, with every
+reply the stand-in logged, 20 of them, a 200 and no option refused.
 
 ## A bottle on exFAT: the `._` files macOS writes are not the game's
 
-Measured in sake on 2026-09-30 in the `ex` bottle, a symlink into a directory on an exFAT
-disk, with Minecraft Dungeons II started through Steam. The game had reset its settings on
-every launch since 2026-09-29, with the community stand-in and with sake's own runtime alike.
+**`patches/0009` leaves macOS's AppleDouble files out of a directory listing** when the file each
+belongs to is beside it and the volume has no native extended attributes. Without it a game on
+such a disk can read one as its own file: Minecraft Dungeons II read one as its settings and
+reset them on every launch, with the community stand-in and with sake's own runtime alike. A
+`._` file on APFS, or one with nothing beside it, is still listed, and a name asked for exactly
+is still found.
+
+*Measured in sake on 2026-09-30 in the `ex` bottle, a symlink into a directory on an exFAT disk,
+with Minecraft Dungeons II started through Steam.*
 
 **macOS writes a second file beside nearly every file there.** exFAT cannot store extended
 attributes itself — `getattrlist` reports `VOL_CAP_INT_EXTENDED_ATTR` unset for that disk and
-set for the internal APFS volume — so macOS keeps a file's attributes in a 4096-byte
-AppleDouble file named `._` and the file's own name. On this Mac a file is given one as soon as
-it is written, because it is given `com.apple.provenance`: the game's saves were, and so was a
-file written from a shell. The bottle held 6,259 of them. Wine lists these as ordinary files,
-marked hidden because their names start with a dot, and its sorted listing puts each before
-the file it belongs to.
+set for the internal APFS volume — so macOS keeps a file's attributes in a 4096-byte AppleDouble
+file named `._` and the file's own name. On this Mac a file is given one as soon as it is
+written, because it is given `com.apple.provenance`: the game's saves were, and so was a file
+written from a shell. The bottle held 6,259 of them. Wine lists these as ordinary files, marked
+hidden because their names start with a dot, and its sorted listing puts each before the file it
+belongs to.
 
 **The game read one as its settings.** It lists `Saved\SaveGames\*.*`, opened
-`._GlobalSaveDataDefault.sav`, read its 4096 bytes and never opened `GlobalSaveDataDefault.sav`
-at all. It then showed SETTINGS FILE DAMAGED and sent the person through the initial setup
-again, although the file it had written is sound: JSON with every byte one lower. With the
-five companions in `SaveGames` removed by hand, the same file loaded and the game went
-straight to play; its next save brought all five back. Steam's client in that bottle had been
-syncing `._sharedconfig.vdf` to Steam Cloud as one of its configuration files: its
-`logs/cloud_log.txt` reports it in sync nine times before the patch.
+`._GlobalSaveDataDefault.sav`, read its 4096 bytes and never opened `GlobalSaveDataDefault.sav` at
+all. It then showed SETTINGS FILE DAMAGED and sent the person through the initial setup again,
+although the file it had written is sound: JSON with every byte one lower. With the five
+companions in `SaveGames` removed by hand, the same file loaded and the game went straight to
+play; its next save brought all five back. Steam's client in that bottle had been syncing
+`._sharedconfig.vdf` to Steam Cloud as one of its configuration files: its `logs/cloud_log.txt`
+reports it in sync nine times before the patch.
 
-**`patches/0009` leaves such a file out of a directory listing** when the file it belongs to is
-beside it and the volume has no native extended attributes. A `._` file on APFS, or one with
-nothing beside it, is still listed, and a name asked for exactly is still found.
-
-**How to tell it worked.** `WINEDEBUG=+file` prints `leaving out` and the name for each file
-left out, and the listing after it holds none of them. On the rebuilt engine, the same day and
-with the five companions back on disk, the game's listing of `SaveGames` left them out and
-returned the five saves, it read `GlobalSaveDataDefault.sav`, and it started with no dialog.
-Steam's next sync named `sharedconfig.vdf` alone and found nothing to download. In
-`wine cmd /c dir`, a `._` file with nothing beside it on the exFAT disk and a `._` file on APFS
-were both listed, and `rmdir /s /q` removed an exFAT directory holding two companions it had
-not been shown, since macOS removes a companion with its file. Starting `cmd` in that bottle
-left out 854 names.
+**How to tell it worked.** `WINEDEBUG=+file` prints `leaving out` and the name for each file left
+out, and the listing after it holds none of them. On the rebuilt engine, with the five
+companions back on disk, the game's listing of `SaveGames` left them out and returned the five
+saves, it read `GlobalSaveDataDefault.sav`, and it started with no dialog. Steam's next sync
+named `sharedconfig.vdf` alone and found nothing to download. In `wine cmd /c dir`, a `._` file
+with nothing beside it on the exFAT disk and a `._` file on APFS were both listed, and
+`rmdir /s /q` removed an exFAT directory holding two companions it had not been shown, since
+macOS removes a companion with its file. Starting `cmd` in that bottle left out 854 names.
 
 Not measured: FAT and SMB volumes, which macOS treats the same way when they lack native
-extended attributes, and whether Steam ever removes the copy of `._sharedconfig.vdf` its
-cloud still holds.
+extended attributes, and whether Steam ever removes the copy of `._sharedconfig.vdf` its cloud
+still holds.
 
-## Killing wineserver leaves the prefix's own services running
+## Taking a bottle down
 
-**Measured in sake on 2026-09-20.** A title was started from the library and stopped again.
-`wineserver -k` took down the game and the server, and then seven processes were still
-there, all reparented to ppid 1:
+**`Bottle.takeDown` is the whole sequence: `wineserver -k`, then `SIGTERM` to whatever is still
+in the prefix, then `SIGKILL`, then a count once more, and what is left is what gets reported**
+rather than an assumption of success. Stopping the `wine` sake started is not enough:
+`Agent.exe` runs with ppid 1, wineserver is its own daemon, and Battle.net keeps a fistful of
+CEF helpers (prototype). `wineserver -k` alone leaves the prefix's own services running, `ps`
+cannot say which prefix a process belongs to, and the directory wineserver keeps its socket in
+can. It finds nothing in a bottle that is a symlink: `Bottle.serverDirectory`
+reads the link's own inode rather than the prefix's
+([#15](https://github.com/typester/sake/issues/15)).
+
+**`wineserver -k` leaves the prefix's own services behind.** A title was started from the
+library and stopped again: `wineserver -k` took down the game and the server, and then these
+seven were still there, all reparented to ppid 1 (sake, 2026-09-20):
 
 ```
 services.exe   winedevice.exe ×2   plugplay.exe
 svchost.exe -k LocalServiceNetworkRestricted   explorer.exe /desktop   rpcss.exe
 ```
 
-They stayed for the rest of the session. Because they had been started by the app, macOS
-kept the app's LaunchServices record alive as `exited-with-subordinates` — so **the Dock
-went on showing a running sake for an app that had already quit**, which is how this was
-noticed at all.
+They stayed for the rest of the session. Because the app had started them, macOS kept its
+LaunchServices record alive as `exited-with-subordinates`, so **the Dock went on showing a
+running sake for an app that had already quit**, which is how this was noticed at all. Six of
+the seven took `SIGTERM`; one `winedevice.exe` needed `SIGKILL`.
 
-Six of the seven took `SIGTERM`; one `winedevice.exe` needed `SIGKILL`.
+**A disk image sake mounted does the same, and lasts longer.** Its `diskimages-helper` keeps
+running with ppid 1, macOS counts that helper as a subordinate of the app that mounted it, and
+the app's LaunchServices record therefore stays at `exited-with-subordinates`, so the Dock shows
+a running sake for an app that quit hours ago, across every launch since. The Game Porting
+Toolkit's evaluation-environment image, mounted by the D3DMetal step at 12:27, was still mounted
+at 13:30; ejecting it took the helper with it, and the tile left the Dock in the same second
+(sake, 2026-09-20). `D3DMetalInstaller` unmounts what it mounts
+([licensing.md](licensing.md#what-sake-actually-does)).
 
-### A mounted disk image does the same thing, and lasts longer
-
-The Wine processes above were found while chasing a Dock tile that would not go away, and
-they turned out not to be the whole answer. **An image sake mounted keeps its
-`diskimages-helper` running with ppid 1**, macOS counts that helper as a subordinate of the
-app that mounted it, and the app's LaunchServices record therefore stays at
-`exited-with-subordinates` — so the Dock shows a running sake for an app that quit hours
-ago, across every launch since.
-
-Measured 2026-09-20: the Game Porting Toolkit's evaluation-environment image had been
-mounted by the D3DMetal step at 12:27 and was still mounted at 13:30. Ejecting it took the
-helper with it and the tile disappeared from the Dock in the same second. `D3DMetalInstaller`
-now unmounts what it mounts; `licensing.md` says why that was always the intention.
-
-### Which prefix a process belongs to: the socket directory
-
-`ps` is no help — these spell themselves `C:\windows\system32\services.exe` and carry
-neither the engine's path nor the game's name, so a sweep looking for those two reports
-success with seven processes up. That was sake's bug, not just a gap in diagnosis.
-
-What does answer it is where wineserver keeps its socket:
+**Which prefix a process belongs to is in the socket directory.** `ps` is no help: these spell
+themselves `C:\windows\system32\services.exe` and carry neither the engine's path nor the game's
+name, so a sweep looking for those two reports success with seven processes up. That was sake's
+bug, not just a gap in diagnosis. What does answer it is where wineserver keeps its socket:
 
 ```
 /tmp/.wine-<uid>/server-<dev>-<inode>       both halves in hex
@@ -568,126 +560,8 @@ actual  /tmp/.wine-502/server-1000012-8763ecd
 ```
 
 The two halves are the **prefix directory's own `st_dev` and `st_ino`**, confirmed against a
-live bottle on 2026-09-20. `lsof -t +D <that directory>` returned exactly those seven pids
-and nothing else — the clients hold the server's `tmpmap-*` shared memory open, so they are
-still found **after the server itself is gone**.
-
-Two things follow. An inode does not change when a directory is renamed, so this identifies
-a bottle's processes across a rename. And it is per prefix, so nothing here can reach a
-CrossOver bottle or another of sake's.
-
-`Bottle.takeDown` is the whole sequence: `wineserver -k`, then whatever is still in the
-prefix gets `SIGTERM`, then `SIGKILL`, then it is counted once more and **what is left is
-what gets reported** rather than an assumption of success.
-
-## Telling failure states apart
-
-RSS alone misleads, and a hang and a slow start look nothing alike. Thread count separates
-the top three states; `vmmap $pid | grep -icE 'Metal|AGX'` says whether graphics was ever
-reached (~50 mappings means never, 100+ means rendering).
-
-| state | threads | RSS | Metal/AGX maps |
-|---|---|---|---|
-| no Rosetta registration, or a mismatched-ABI module | 9-11 | 125-155 MB | ~50 |
-| the `\DosDevices` loop (before the BOOLEAN fix) | 12 | 235-245 MB | ~50 |
-| graphics up, waiting on the client | 17-19 | 390-410 MB | 74-81 |
-| running and rendering | 83-98 | 1.7-4.6 GB | 100+ |
-
-Four traps in that table, each of which produced a wrong conclusion in the prototype:
-
-- **The running row kept being too narrow.** It read 83-90, then 83-96, then 83-98, widened
-  each time someone measured again. Read it as "well past 40", not as a window to match.
-- **The counts include the process row** (`ps -M -p $pid | tail -n +2 | grep -c .`). Count
-  thread rows alone and everything reads one low — the stall comes out at 11, lands in the
-  row above, and a reproducing hang gets reported as a dead build.
-- **Threads do not separate the bottom two states.** 9-11 against 12 is one thread. RSS is
-  what tells those apart: 125-155 MB against 235-245 MB.
-- **Sample, do not read once at the end.** A build that clears the check and then dies of
-  something unrelated looks identical to one that never cleared it, if you only look at the
-  end. Keep the peak.
-
-Identify the game's process by the `argv[0]` that *ends with* the executable name, not one
-that contains it: a loose match also catches `cmd.exe`, `start.exe` or any launcher carrying
-the name in its own arguments. That happened twice. Matching the bare name at the start is
-not enough either, because `argv[0]` is spelled differently depending on how the game was
-started. Cut `argv[0]` at its first `.exe` and check what that ends with.
-
-## Diagnostic technique that paid off
-
-- **Search before analysing.** The `WINE_SIMULATE_WRITECOPY` fix is documented across
-  Lutris, GamingOnLinux and CodeWeavers' own forum. Hours of first-principles crash analysis
-  went in before anyone searched. The lesson was then ignored on the Play button and the
-  same bill arrived. Caveat learned the second time: the search found the *game update*, not
-  the *cause*. **Search first, then measure.**
-- **Diff against a working implementation on the same machine.** CrossOver is installed and
-  this tree is built from *its* sources, so anything that differs is configuration or build
-  flags. Running CrossOver's binaries against the prototype's bottle answered "build or
-  bottle?" in one command. Its Perl `bin/wine` is readable and
-  `--bottle NAME --ux-app /usr/bin/env` dumps the environment its launcher builds — bisect
-  the environment from the side that works, rather than guessing single variables against a
-  failing run.
-- **Make the two candidates produce different observable output before believing either.**
-  The Play button was blamed on `Agent.exe` not passing an environment variable. The
-  variable arrives. The diagnosis stood because the symptom it predicted was the symptom
-  present.
-- **Read the application's own logs first.** Battle.net writes
-  `drive_c/users/<user>/AppData/Local/Battle.net/Logs/{battle.net,libcef}-*.log`, and the
-  libcef log named the real problem after a lot of guessing had not.
-- **`--remote-debugging-port=9222`** distinguishes "not painting" from "painting but not
-  shown". Battle.net forwards unrecognised arguments to CEF. `Page.captureScreenshot` proved
-  the renderer was drawing the login form perfectly while the window was black.
-- **MoltenVK's `Created N swapchain images with size (W, H)` lines are a free instrument.**
-  Comparing which surface sizes appear between runs exposed the missing content-sized
-  surface and then confirmed the fix.
-- **`WINEDEBUG=+loaddll` names the last DLL before a hang** and is safe on its own.
-  `+server`, `+syscall`, `+module`, `+seh` and `+file` are light enough to keep a failure
-  reproducing.
-- **Wine keeps its sockets in `wineserver`**, not the Windows-side process. `lsof` against
-  the Battle.net pid shows zero connections while it is talking to Blizzard happily. This
-  produced three consecutive wrong network conclusions.
-- **`wineserver -k` silently targets `~/.wine` unless `WINEPREFIX` is set**, exits 0, and
-  reports success having killed nothing. It is the first half of taking a bottle down —
-  `Agent.exe` runs with ppid 1, wineserver is its own daemon, and Battle.net keeps a
-  fistful of CEF helpers — but **it is not the whole of it**, which is the next section.
-- **`WINEDEBUG=err+all` causes crashes rather than revealing them.** A failed `dlopen` of a
-  missing dylib produces a `dlerror()` string long enough to overflow Wine's debug buffer;
-  the exception cannot be dispatched and the process dies. Raising the log level turns a
-  cleanly handled failure into a crash.
-- **A whole-module relay trace can hide the bug.** `RelayFromInclude` on the loader logs ~7M
-  calls and the game then starts fine. That was read as timing sensitivity and it was not
-  one — the overhead changes what callees leave on the stack. A Heisenbug is a limit on
-  which instrument you may use, not evidence about the cause.
-- **Attaching a debugger to Diablo IV is destructive.** The protected loader answers with an
-  unhandled `0xc00000e5` and obfuscated registers, and the process drops from 58% CPU to
-  1.8% — the state you came to read is gone. `sample(1)` is safe but cannot unwind through
-  `__wine_syscall_dispatcher`.
-- **Check that the control actually ran.** A control run whose log is zero bytes did not
-  reproduce anything; it failed to start.
-- **`WINEDEBUG=+pid` before anything else with more than one process.** Without it every
-  trace prefix is a thread id, and four Chromium processes cannot be told apart. Learned on
-  Steam, 2026-09-20.
-- **`WINEDEBUG=<program>:+<channel>` traces one process.** An option with a name and a colon in
-  front applies only where the executable has that name (`parse_options` in
-  `dlls/ntdll/unix/debug.c`), so a game started by Steam can be traced without Steam's own
-  processes. `-all,Dungeons-Win64-Shipping.exe:+pid,Dungeons-Win64-Shipping.exe:+file` in
-  Steam's environment gave 24 MB by the time the game showed its first dialog, 2026-09-30.
-- **`+macdrv_d3dmtl` is D3DMetal's half of the conversation.** It is the channel of the glue
-  in `dlls/winemac.drv/d3dmetal.c`, the only code D3DMetal calls in Wine. A `get_win_data`
-  with no `create_metal_device` after it means winemac returned NULL, and the six calls of a
-  swapchain's creation read like a checklist.
-- **`+win` names the owner of an HWND**, class and parent included, which is how "whose window
-  is the GPU process drawing into" got answered.
-- **A fault inside a dylib has no module name in `+seh`.** `vmmap` a live process for the
-  `__TEXT` ranges of `libd3dshared`, `D3DMetal` and `winemac.so`, then `objdump -d` the dylib
-  at `rip` minus its start; `+loaddll` only knows PE modules.
-- **Crashpad eats the crash.** A CEF process never reaches `winedbg --auto`, so there is no
-  backtrace to wait for; `+seh` is the only view of where it died.
-- **A Wine window can be photographed even behind the terminal.** Once Screen Recording is
-  granted to the terminal, `screencapture -x -o -l <CGWindowID>` captures an occluded window,
-  and `CGWindowListCopyWindowInfo` gives the id (owner `wine`). A full-screen capture shows
-  whatever is in front, which here is always the terminal. This is what turned "black" from a
-  report into 100.00% of 1,232,000 pixels. **Not once the window hosts another process's
-  layer**: then `-l` fails with "could not create image from window" and `-R` never worked
-  here at all, so raise the window (`set frontmost of (first process whose unix id is …)`
-  through System Events), take the full screen, crop to the window's bounds, and hand focus
-  back to the terminal.
+live bottle, and `lsof -t +D <that directory>` returned exactly those seven pids and nothing
+else: the clients hold the server's `tmpmap-*` shared memory open, so they are still found
+**after the server itself is gone** (sake, 2026-09-20). An inode does not change when a
+directory is renamed, so this identifies a bottle's processes across a rename; and it is per
+prefix, so nothing here can reach a CrossOver bottle or another of sake's.

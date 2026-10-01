@@ -26,8 +26,8 @@ This is why no open-source launcher bundles D3DMetal and why they all make you s
 
 ### What sake actually does
 
-Implemented and measured on 2026-09-19. `redist/lib` on the evaluation-environment volume is
-68 MB and holds exactly this:
+*Implemented and measured in sake on 2026-09-19; the unmounting was added on 2026-09-20.*
+`redist/lib` on the evaluation-environment volume is 68 MB and holds exactly this:
 
 ```
 external/D3DMetal.framework        67 MB, three symlinks inside it
@@ -39,9 +39,9 @@ wine/x86_64-windows/*.dll          the same six
 sake mounts the nested image with `hdiutil attach -nobrowse -readonly`, copies that tree into
 `~/Library/Caches/Sake/d3dmetal`, **unmounts it again**, and copies it from there into the
 engine. Unmounting is the point of keeping the copy: nothing afterwards needs the image, and
-an image left mounted follows the app around — `runtime.md` has what that cost. An image
-the user opened themselves is left alone; only what sake mounted is put back.
-Added 2026-09-20.
+an image left mounted follows the app around — [runtime.md](runtime.md#taking-a-bottle-down)
+has what that cost. An image the user opened themselves is left alone; only what sake mounted
+is put back.
 
 Three things about that worth keeping:
 
@@ -62,10 +62,10 @@ miserable, so sake keeps its own copy of `redist/lib`.
 
 That copy is **the user's**, made on their machine from media they obtained under Apple's
 licence. sake does not distribute it, does not put it on a network, and deletes it with the
-cache. That last one stopped being a promise on 2026-09-19: uninstalling takes
+cache. That last one is a test rather than a promise (sake, 2026-09-19): uninstalling takes
 `~/Library/Caches/Sake` away whole, and a test asserts both that `d3dmetal` is inside it and
 that it is gone afterwards, so the day somebody moves the cache copy elsewhere the test says
-so. The three things sake must never do are unchanged: it does not ship D3DMetal, does not
+so. The three things sake must never do stand as they are: it does not ship D3DMetal, does not
 download it on the user's behalf, and does not take it out of an installed CrossOver.
 
 ## Importing out of a CrossOver bottle
@@ -92,7 +92,7 @@ accepting the terms of whoever made it, and that is the user's act — the same 
 D3DMetal step points at Apple's download page instead of reaching for it.
 
 What sake does is run a `.exe` or `.msi` the user already has, in the bottle they chose,
-with the environment `runtime.md` describes. The file stays where it is; nothing is copied
+with the environment [runtime.md](runtime.md#three-settings-every-run-needs) describes. The file stays where it is; nothing is copied
 into the app, and nothing about the installer is redistributed.
 
 ## Wine and the patches
@@ -109,26 +109,29 @@ happy would hide the one thing about it that has to be visible.
 ## GDK titles
 
 For titles built on Microsoft's GDK, sake provides its own stand-in for the Gaming Runtime
-(`gdk.md`). It never ships, downloads or copies Microsoft's GDK or Gaming Services, and it
-takes no code or text from the community stand-in, whose repository has no licence: what the
-stand-in's log and README record of its behaviour, and what its DLL does when a probe calls
-it from outside, is used as a record and nothing more. Its task queue
-and `XAsync` are libHttpClient's, which is Microsoft's and MIT-licensed: fetched at a pinned
-commit rather than kept in this repository, and contained in any DLL built from it, so
-libHttpClient's licence goes wherever that DLL goes. Setup builds the DLL on the person's own
-Mac and keeps libHttpClient's `LICENSE.md` beside it in the engine, and every copy sake puts in
-a bottle's `system32` has that licence put beside it. The one file is enough: of what sake
-compiles out of `Source/Task` and `Include`, every file that names a copyright holder names
-Microsoft, and `NOTICE.txt` and `ThirdPartyNotices.txt` are about code sake does not compile
-(read 2026-09-30). From WineGDK it takes facts and no text:
-which IDs the interfaces have and the order of their slots. This section used to say code
-would start from the part of WineGDK its author declared CC0; the part worth taking turned out
-to be libHttpClient's, under an LGPL header there (`gdk.md`). Signing in uses the title's own
-`MSAAppId` from its `MicrosoftGame.config`; sake signs in as no other application, and every
-request made while finding out how used that ID alone. Its requests are the shapes Microsoft's
-documentation gives where it gives them and otherwise what the services accepted
-(`gdk.md`); none comes from the stand-in or from Xodus. Which token is bound to a device
-follows the stand-in's README, which says PlayFab needs one.
+([gdk.md](gdk.md)).
+
+- **It never ships, downloads or copies Microsoft's GDK or Gaming Services.**
+- **It takes no code or text from the community stand-in**, whose repository has no licence.
+  What the stand-in's log and README record of its behaviour, and what its DLL does when a probe
+  calls it from outside, is used as a record and nothing more.
+- **Its task queue and `XAsync` are libHttpClient's**, which is Microsoft's and MIT-licensed:
+  fetched at a pinned commit rather than kept in this repository, and contained in any DLL built
+  from it, so libHttpClient's licence goes wherever that DLL goes. Setup builds the DLL on the
+  person's own Mac and keeps libHttpClient's `LICENSE.md` beside it in the engine, and every copy
+  sake puts in a bottle's `system32` has that licence put beside it. The one file is enough: of
+  what sake compiles out of `Source/Task` and `Include`, every file that names a copyright holder
+  names Microsoft, and `NOTICE.txt` and `ThirdPartyNotices.txt` are about code sake does not
+  compile (read 2026-09-30).
+- **From WineGDK it takes facts and no text**: which IDs the interfaces have and the order of
+  their slots. The part of WineGDK worth taking is libHttpClient's, under an LGPL header there
+  ([gdk.md](gdk.md#winegdk)).
+- **Signing in uses the title's own `MSAAppId`** from its `MicrosoftGame.config`; sake signs in
+  as no other application, and every request made while finding out how used that ID alone. Its
+  requests are the shapes Microsoft's documentation gives where it gives them and otherwise what
+  the services accepted ([gdk.md](gdk.md#signing-in-against-the-real-services)); none comes from
+  the stand-in or from Xodus. Which token is bound to a device follows the stand-in's README,
+  which says PlayFab needs one.
 
 ## Why D3DMetal cannot simply be avoided
 

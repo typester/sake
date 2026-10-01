@@ -123,28 +123,44 @@ implementing anything it covers.
 
 | file | what it covers |
 |---|---|
-| `docs/getting-started.md` | Diablo IV from an empty Mac to a keypress; the only file here for using sake |
-| `docs/roadmap.md` | phases, and the settled boundary between Swift and subprocesses |
+| `docs/getting-started.md` | Diablo IV from an empty Mac to a keypress; instructions for using sake |
+| `docs/troubleshooting.md` | what to do when something goes wrong; instructions, like getting-started |
+| `docs/how-it-works.md` | the overview: engine, bottles, titles, the setup steps, what Play does, the patches at a glance |
+| `docs/roadmap.md` | where the project stands, what is next, open questions, and the settled Swift/subprocess boundary |
 | `docs/wine-build.md` | building Wine; the configure flags that must not be removed |
-| `docs/runtime.md` | the three settings games need, the Play-button root cause, controllers, failure states |
+| `docs/runtime.md` | the settings every run needs, starting and stopping a title, controllers, and what each patch fixes and how to tell |
 | `docs/gdk.md` | GDK titles: the runtime DLL and the sign-in sake provides in place of Gaming Services |
+| `docs/debugging.md` | telling failure states apart, and the instruments and techniques that found things |
 | `docs/licensing.md` | what may not be redistributed, and what the app may not do for the user |
 | `docs/layout.md` | on-disk layout, why nothing mutable goes in the bundle, relocatability |
 | `docs/releasing.md` | how a release is cut, and the three things it needs that are not in this repository |
 
-Three standing rules about that content:
+Standing rules about that content:
 
-- **Claims in `docs/` carry their source and date.** Most were measured in the prototype and
-  not in sake; do not restate those as sake's own behaviour. Where sake has measured
-  something itself the section says so and gives the date — keep that distinction, and date
-  what you add.
+- **`docs/` is written for people first.** An AI reads it too, but it is laid out for somebody
+  who opens one file to find one thing. A section's first sentence is the rule, the fact or
+  what to do; the measurement behind it comes after. One topic has one home, and other files
+  link to it. There is no revision history: a correction replaces the wrong sentence, git keeps
+  the old one, and a wrong answer that looks right stays only as a trap worth naming. An
+  answered question leaves Open questions, and its answer goes where the topic lives.
+- **Claims in `docs/` carry their source and date**, as a tag at the end —
+  `(sake, 2026-09-19)`, `(prototype, 2026-09-17)`, `(the owner's report, 2026-09-20)`,
+  `(read in CrossOver 26.3.0's sources, 2026-09-29)` — or once, in an italic line under the
+  heading, when a whole section was measured in one sitting. Most findings were measured in
+  the prototype and not in sake; do not restate those as sake's own, and date what you add.
 - **Do not relitigate the Swift/subprocess boundary** without new information;
   `docs/roadmap.md` records why it is where it is.
-- **`docs/getting-started.md` is instructions, and stays that way.** It is written for somebody
-  using sake rather than building it: steps rather than prose, and **no dated claims at all** —
-  what has been run here, what has not, and on which hardware belongs in the files that already
-  carry it, because a page people follow is where that goes stale first. Screenshots go in
-  `assets/getting-started/`.
+- **`docs/getting-started.md` and `docs/troubleshooting.md` are instructions, and stay that
+  way.** They are written for somebody using sake rather than building it: steps rather than
+  prose, and **no dated claims at all** — what has been run here, what has not, and on which
+  hardware belongs in the files that already carry it, because a page people follow is where
+  that goes stale first. Screenshots go in `assets/getting-started/`.
+- **`runtime.md` and `gdk.md` keep their names.** `patches/*.patch` names the first and
+  `xgameruntime/src/` the second, and neither can follow a rename: a patch's bytes are the
+  engine's fingerprint and `xgameruntime/` but its README is the runtime's stamp, so every
+  user's setup would ask for a rebuild. Keep what those comments point at in the file they name.
+- **The README's "Verified by me" is the owner's**: a game goes there once the owner has
+  played it. A community entry comes from a report and links it.
 
 ## Licence boundary
 

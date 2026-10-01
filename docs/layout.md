@@ -2,9 +2,9 @@
 
 Where sake puts things, and why the obvious alternative does not work.
 
-Everything below was measured on 2026-09-18 against the d4-mac prototype's tree, on one
-machine (Apple silicon, macOS 27.0, CLT 27.0), except where a section carries its own date —
-those were measured in sake.
+*Unless a section carries its own date, this was measured on 2026-09-18 against the d4-mac
+prototype's tree, on one machine (Apple silicon, macOS 27.0, CLT 27.0); the dated sections were
+measured in sake.*
 
 ## The layout
 
@@ -38,23 +38,21 @@ those were measured in sake.
 ```
 
 Uninstalling is an explicit action in the app, not a side effect of dragging the bundle to
-the Trash. Those two directories are the whole of it, and both go to the Trash like a bottle
-does. **Sake.app is not one of them** — it is running at the time, and a bundle in
-`/Applications` is the user's to drag away; the sheet says so rather than leaving the user
-to wonder whether the app deleted itself.
+the Trash. It takes those two directories, and both go to the Trash like a bottle does.
+**Sake.app is not one of them** — it is running at the time, and a bundle in `/Applications`
+is the user's to drag away; the sheet says so rather than leaving the user to wonder whether
+the app deleted itself. What the sign-in keeps is inside `~/Library/Sake`, in `sign-ins/`, so
+uninstalling lists it on a line of its own and takes it to the Trash with the rest, refresh
+tokens and all, where emptying the Trash is what finally removes them (sake, 2026-09-30).
 
-Those two are not the whole of what sake leaves, which this section did not say until
-2026-09-29. AppKit keeps the windows' frames and the open panel's last folder in
-`~/Library/Preferences/dev.typester.sake.plist`, and `SourceFetcher`'s default URLSession
-left `~/Library/HTTPStorages/dev.typester.sake` and `~/Library/Caches/dev.typester.sake`
-on 2026-09-20. Uninstalling does not take them yet. The sign-in uses a session that keeps
-nothing on disk, so it adds nothing there.
+**Three small things outside those two are left behind.** AppKit keeps the windows' frames and
+the open panel's last folder in `~/Library/Preferences/dev.typester.sake.plist` (sake,
+2026-09-29), and `SourceFetcher`'s default URLSession left
+`~/Library/HTTPStorages/dev.typester.sake` and `~/Library/Caches/dev.typester.sake` (sake,
+2026-09-20). Uninstalling does not take them yet.
+The sign-in uses a session that keeps nothing on disk, so it adds nothing there.
 
-What the sign-in keeps is inside `~/Library/Sake`, in `sign-ins/`, so uninstalling lists it
-on a line of its own and takes it to the Trash with the rest, refresh tokens and all, where
-emptying the Trash is what finally removes them. Added 2026-09-30.
-
-Run for real on 2026-09-19 against the tree described above, and put back afterwards:
+Run for real in sake on 2026-09-19 against the tree described above, and put back afterwards:
 
 | | |
 |---|---|
@@ -72,10 +70,10 @@ later.
 ## A bottle's name is a directory name
 
 There can be as many bottles as somebody wants, and the name they type is both the directory
-under `bottles/` and the value of `WINEPREFIX`. A second one, made on 2026-09-19, cost what
-the first did — `runtime.md` has the figures — and `Bottle.all` finds it by its `system.reg`
-rather than by it being a directory, so a creation stopped part way is not offered as a
-bottle.
+under `bottles/` and the value of `WINEPREFIX`. A second one cost what the first did
+([runtime.md](runtime.md#a-bottle) has the figures; sake, 2026-09-19), and `Bottle.all` finds it
+by its `system.reg` rather than by it being a directory, so a creation stopped part way is not
+offered as a bottle.
 
 Three names are refused, and one that looks like it should be is not:
 
@@ -115,9 +113,9 @@ guard against it is wrong. The volume is case-insensitive, so the new name alrea
 performs it. What makes it reachable at all is excluding the bottle being renamed from the
 case-insensitive collision check above.
 
-What has to happen first, for a rename and for a delete alike, is `wineserver -k` against
-this prefix — see `runtime.md`, and note that the same command without `WINEPREFIX` goes
-after `~/.wine`, kills nothing of the user's and exits 0.
+What has to happen first, for a rename and for a delete alike, is taking this prefix down
+([runtime.md](runtime.md#taking-a-bottle-down)) — and note that `wineserver -k` without
+`WINEPREFIX` goes after `~/.wine`, kills nothing of the user's and exits 0.
 
 ### Which is why the titles added by hand live in the prefix
 
@@ -127,7 +125,7 @@ themselves — a name, the arguments, the environment, and the executable **rela
 in it names the prefix, so it inherits everything the section above measured: a rename
 stays a `moveItem`, and throwing the bottle away takes its titles with it. Keeping the
 list under `~/Library/Sake` instead would make both of those an operation on two places
-that have to agree, which is the shape of bug that outlives the feature. Added 2026-09-20.
+that have to agree, which is the shape of bug that outlives the feature.
 
 Wine ignores what it does not recognise at a prefix's root — it keeps its own
 `.update-timestamp` there — and a bottle nobody has added anything to has no
@@ -179,7 +177,8 @@ Two things constrain it:
 - **The clone has to land at the same relative path.** `ProgramData/Battle.net/Agent/product.db`
   records the install as `C:/Program Files (x86)/Diablo IV`, so the client recognises the
   game only if it is there. (Prototype, 2026-09-17.)
-- **`drive_c/windows` is never touched** — that is CrossOver's own Wine; see `licensing.md`.
+- **`drive_c/windows` is never touched** — that is CrossOver's own Wine; see
+  [licensing.md](licensing.md#importing-out-of-a-crossover-bottle).
   `drive_c/users` is left alone as well, on weaker grounds: the prototype never carried a
   user profile across and Battle.net rebuilt its own.
 
@@ -217,8 +216,9 @@ the confirmation sheet presents it as one rather than as a promise.
 
 ## Why not Application Support
 
-Measured in sake on 2026-09-19. `~/Library/Application Support/Sake` is the obvious home and
-it does not work: the engine is an autotools `--prefix`, and the space in "Application
+*Measured in sake on 2026-09-19.*
+
+`~/Library/Application Support/Sake` is the obvious home and it does not work: the engine is an autotools `--prefix`, and the space in "Application
 Support" splits back out of `CPPFLAGS` and `LDFLAGS` the moment a configure script expands
 them. Every one of the eight library builds failed the same way:
 
@@ -281,8 +281,8 @@ $ otool -l .../D3DMetal.framework/Versions/A/D3DMetal | grep -A4 LC_BUILD_VERSIO
 macOS 14 is the floor D3DMetal sets. sake targets 15 anyway, for reasons above it rather
 than below it:
 
-- SwiftUI's `UtilityWindow` is `@available(macOS 15.0, *)`, and it is the window style this
-  app wants for the setup flow's own windows. 14 would rule it out.
+- SwiftUI's `UtilityWindow` is `@available(macOS 15.0, *)`, and it is the window style an
+  auxiliary window of this app would want. 14 would rule it out.
 - The Game Porting Toolkit that supplies D3DMetal wanted Sequoia by version 3, so users who
   can obtain D3DMetal at all are essentially all on 15 or newer.
 - Nothing is gained by going higher. The UI this app needs is available at 15, so raising
@@ -295,12 +295,12 @@ which cannot become the main window, cannot be minimised, and has `hidesOnDeacti
 The last of those decides where it may be used — a window whose job is to say "download this
 from Apple" must not vanish the moment the user switches to a browser.
 
-That rules out more than this file first thought. sake has two windows as of 2026-09-19: the
-library, and the setup wizard. The wizard is exactly the window that says "download this from
-Apple", because that is what its D3DMetal step asks for. **So both are plain `Window`s and
-nothing uses the utility style yet.** The deployment target stays at 15 on its other
-grounds; when an auxiliary window does turn up — a build log is the obvious candidate — it
-is the one that can carry the style, because nothing about it sends the user elsewhere.
+That rules out the setup wizard, which is exactly the window that says "download this from
+Apple", because that is what its D3DMetal step asks for. **So both of sake's windows, the
+library and the wizard, are plain `Window`s, and nothing uses the utility style yet.** The
+deployment target stays at 15 on its other grounds; when an auxiliary window does turn up — a
+build log is the obvious candidate — it is the one that can carry the style, because nothing
+about it sends the user elsewhere.
 
 Raise it when a macOS 26-only API earns it; raising a deployment target later is cheap.
 
@@ -350,8 +350,7 @@ What genuinely stays pinned is `bison`, which compiles in the location of its sk
 So sake writes `@loader_path`-relative sonames, rewriting `include/config.h` between
 configure and make.
 
-Measured against a real build on 2026-09-19, which this file previously said remained to be
-done:
+Measured against a real build (sake, 2026-09-19):
 
 - The four come out as `@loader_path/../../libfreetype.6.dylib` and the like — `../..`
   because the only thing that `dlopen`s them is `lib/wine/x86_64-unix/`, two levels under
@@ -365,8 +364,7 @@ Rows five and six of the table survive as expected: `ntdll.so` and `bin/wine` st
 `engine/{bin,lib,lib/wine,share/wine}`, which is what Wine recomputes from `dladdr` at
 startup rather than trusting.
 
-**Wine itself loading them**, which this file previously listed as the remaining unknown,
-was measured on 2026-09-19 once there was a prefix to run in:
+**Wine itself loads them** (sake, 2026-09-19, once there was a prefix to run in):
 
 - `DYLD_PRINT_LIBRARIES=1` over a `wine reg query` shows dyld loading
   `engine/lib/libfreetype.6.dylib` and `engine/lib/libSDL2-2.0.0.dylib`. Their only openers
@@ -374,27 +372,25 @@ was measured on 2026-09-19 once there was a prefix to run in:
   hop being taken, not a lucky absolute path.
 - MoltenVK prints its own banner during `wineboot --init` (`MoltenVK version 1.4.2,
   supporting Vulkan version 1.4.357`), so `libMoltenVK.dylib` loaded as well.
-- **gnutls is the one still unobserved.** `bcrypt.so` opens it when something asks for TLS,
-  and nothing has yet. The soname is written the same way as the other three.
+- **gnutls is the one not seen loading by name.** `bcrypt.so` opens it when something asks for
+  TLS, and the soname is written the same way as the other three. HTTPS through Wine's own
+  WinHTTP works in sake's bottles (sake, 2026-09-29 and 2026-09-30), but nothing checked which
+  library served it, so gnutls is still the one soname not seen loading by name.
 
-## Path length is a real constraint, and the new path is untested
+## Soname length no longer depends on where the engine lives
 
-The prototype's README records that with a long root, the absolute sonames grow long enough
-that verbose `WINEDEBUG` channels overflow Wine's debug buffer and kill the process — taking
-away the diagnostic tool exactly when it is needed. Its numbers: 146 characters was too long,
-70 was fine.
+**With `@loader_path` sonames, where the engine lives does not change how long they are**: the
+longest is 38 characters (sake, 2026-09-19). It mattered for the prototype's absolute sonames.
+Its README records that with a long root they grow long enough that verbose `WINEDEBUG`
+channels overflow Wine's debug buffer and kill the process — taking away the diagnostic tool
+exactly when it is needed. Its numbers: 146 characters was too long, 70 was fine.
 
-| root | resulting soname length |
+| root | resulting absolute soname length |
 |---|---|
 | `~/.local/share/d4-mac` (the prototype, known good) | ~76 |
 | `~/Library/Application Support/Sake` (rejected above) | ~92 |
 | `~/Library/Sake` | ~65 |
 
-The 92 that sat in the untested gap between the two known points is no longer a question to
-answer twice over. `~/Library/Sake` comes out at 65 on a fifteen-character user name, shorter
-than the length already known to work — and as of 2026-09-19 sake writes `@loader_path`
-sonames anyway, whose longest is 38 characters and does not depend on where the engine lives
-at all.
-
-`Paths` still takes both roots as parameters, so a root that turns out to be wrong again does
-not reach into every caller.
+`~/Library/Sake` would come out at 65 on a fifteen-character user name, shorter than the length
+already known to work. `Paths` still takes both roots as parameters, so a root that turns out to
+be wrong again does not reach into every caller.

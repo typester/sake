@@ -5,22 +5,27 @@ GUI, so none of it takes a terminal.
 
 ![The library window: a bottle in the sidebar with the titles in it, one selected, with a Play button and the arguments it starts with](assets/library.png)
 
-## Status
+## What runs
 
-Playing here now:
+### Verified by me
 
-- **Diablo IV**
-- **Steam**
+- **Diablo IV** (Battle.net) — start it from the Battle.net launcher
+- **Stardew Valley** (Steam)
+- **Minecraft Dungeons II** (Steam, 0.2.0+) — party codes work
 
-I wrote sake to play those two, and that is as far as it has been taken — one person, one
-Mac. If you get something else running with it I would like to hear about it, and if you
-cannot, that is worth hearing too.
+That is one person on one Mac, an Apple M5 on macOS 27. The Battle.net and Steam clients
+themselves install, sign in and run.
+
+### Verified by the community
+
+Nothing yet — [report it](https://github.com/typester/sake/issues/new?template=compatibility.yml)!
+A game that runs is worth hearing about, and so is one that does not.
 
 ## What it does
 
-The app answers whether this Mac can do the rest — Apple silicon, Rosetta 2, the Command
-Line Tools, Apple's Game Porting Toolkit, room on disk — then walks seven steps, one screen
-at a time:
+The setup wizard walks seven steps, one screen each. The first checks this Mac — Apple
+silicon, Rosetta 2, the Command Line Tools, Apple's Game Porting Toolkit, room on disk — and
+the other six build everything else:
 
 1. download the sources and check them against known hashes
 2. unpack them and build the tools and libraries Wine is configured against
@@ -28,16 +33,15 @@ at a time:
 4. guide Apple's D3DMetal in from an image you mounted, and unmount it again
 5. build what games made with Microsoft's GDK load in place of Xbox Gaming Services
 6. make a bottle — one Wine prefix, which is where a game lives
-7. put a game in it — its own installer, the one you downloaded, runs inside the bottle
 
-After that the library is where you live. A bottle holds titles you added; a title is a
-program in that bottle, its name, the arguments it starts with and any environment of its
-own. Picking a program that
-carries `libcef.dll` fills those arguments in with what a Chromium client needs, because
-that is the one thing this stack is known to require and easy to forget. A title's name and
-arguments can be changed afterwards, a bottle can be renamed or thrown away, and the app
-menu has an Uninstall that takes away everything sake made. All of it goes to the Trash, so
-it can be put back.
+After that the library is where you live. A game goes into a bottle through its own
+installer, the one you downloaded, run inside the bottle. A bottle holds titles you added; a
+title is a program in that bottle, its name, the arguments it starts with and any environment
+of its own. Picking a program that carries `libcef.dll` fills those arguments in with what a
+Chromium client needs, because that is the one thing this stack is known to require and easy
+to forget. A title's name and arguments can be changed afterwards, a bottle can be renamed or
+thrown away, and the app menu has an Uninstall that takes the engine, the bottles and the
+caches away. All of it goes to the Trash, so it can be put back.
 
 ## Requirements
 
@@ -89,10 +93,12 @@ Play button.
 For a launcher like Battle.net, start the launcher and press Play inside it. sake
 deliberately does not offer a button that starts Diablo IV directly: the client only hands
 out a login token after that press, so a direct start reaches the game and then fails on the
-token. `docs/runtime.md` has the measurements behind that.
+token. [`docs/runtime.md`](docs/runtime.md#pressing-play-does-two-separable-things) has the
+measurements behind that.
 
 **[`docs/getting-started.md`](docs/getting-started.md) walks one game through all of this
 with screenshots** — Diablo IV, from a Mac with nothing on it to a character on screen.
+When something goes wrong, [Troubleshooting](docs/troubleshooting.md) is where to look.
 
 ## Why build Wine at all
 
@@ -104,7 +110,7 @@ wishful thinking. Upstream Wine does not have it.
 **D3DMetal itself is not redistributable**, so sake will never ship it, download it for you,
 or take it out of an installed CrossOver — it guides you through downloading Apple's Game
 Porting Toolkit yourself, mounts the image inside it, copies out the part it needs, and
-unmounts it again. See `docs/licensing.md`.
+unmounts it again. See [`docs/licensing.md`](docs/licensing.md).
 
 ## What is here
 
@@ -133,24 +139,34 @@ Requires the Xcode Command Line Tools. Xcode is not needed, and there is no Xcod
 On macOS 27 the Command Line Tools default to the macOS 27.0 SDK, which SwiftUI cannot be
 built against without a macro plugin the CLT do not ship. `build-app.sh` detects this and
 falls back to a macOS 26 SDK, printing what it did. Override with `SDKROOT` if needed. See
-`CLAUDE.md` for the full story.
+[`CLAUDE.md`](CLAUDE.md) for the full story.
 
 ## Documentation
 
-`docs/` is the real content of this repository. Every claim in it names where and when it was
-measured. Much of it is still the prototype's; the sections sake has measured itself say so
-and carry their own date.
+Using sake:
 
-| file | what it covers |
-|---|---|
-| `docs/getting-started.md` | the one written for using sake rather than building it: Diablo IV, step by step, with screenshots |
-| `docs/roadmap.md` | the goal, the phases, and where Swift stops and subprocesses start |
-| `docs/wine-build.md` | building Wine from CrossOver's sources; the flags that cannot be dropped |
-| `docs/runtime.md` | creating a prefix, the three settings that make games run, what pressing Play actually does, controllers, taking a bottle down, and how to tell four failure states apart |
-| `docs/licensing.md` | what may and may not be redistributed, and why D3DMetal is unavoidable |
-| `docs/layout.md` | where files go, why importing a 100 GB game costs nothing and removing it returns nothing either, why nothing mutable lives in the app bundle, and what pins a built tree to its path |
+- [Getting started](docs/getting-started.md) — Diablo IV from an empty Mac to a character on screen, with screenshots
+- [Troubleshooting](docs/troubleshooting.md) — where the logs are, and what the known problems look like
+
+How it works:
+
+- [How sake works](docs/how-it-works.md) — engine, bottles and titles, the setup steps, what Play does, and what sake changes in Wine
+- [Licensing](docs/licensing.md) — what sake may not ship or fetch for you, and why D3DMetal cannot be avoided
+- [Where files live](docs/layout.md) — the on-disk layout, and why nothing mutable goes in the app
+
+Working on sake:
+
+- [Building Wine](docs/wine-build.md) — CrossOver's sources, the patches, and the configure flags that must stay
+- [Running games](docs/runtime.md) — the settings every run needs, and what each patch fixes
+- [GDK titles](docs/gdk.md) — the runtime and the Xbox sign-in sake provides in place of Gaming Services
+- [Debugging](docs/debugging.md) — telling failure states apart, and the instruments that found things
+- [Roadmap](docs/roadmap.md) — where it stands, what is next, and the questions still open
+- [Releasing](docs/releasing.md) — how a release is cut
+
+Most of what `docs/` says about Wine was first measured in the shell prototype sake replaced;
+each claim says whose measurement it is and when.
 
 ## Licence
 
 MIT, except `patches/`: patches against Wine's own source are derivatives of LGPL code and
-are LGPL-2.1-or-later. See `docs/licensing.md`.
+are LGPL-2.1-or-later. See [`docs/licensing.md`](docs/licensing.md).

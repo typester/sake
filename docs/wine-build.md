@@ -2,13 +2,12 @@
 
 What the build has to do, and which parts of it are not negotiable.
 
-Everything here was learned in the d4-mac prototype between 2026-08 and 2026-09-17, on one
-machine (Apple silicon, macOS 27.0), unless a section says otherwise. **sake produced the
-nine components below and then built Wine itself on 2026-09-19** — configure, the soname
-rewrite, make and install, 4m40s for Wine on ten cores, 1.1 GB of engine. Later the same day
-it created a prefix with that engine and Wine came up clean, and later still a game started
-in it; `runtime.md` has both. Treat anything not marked as sake's own measurement as the
-specification the implementation has to satisfy rather than a report on its behaviour.
+*Unless a section says otherwise, this was learned in the d4-mac prototype between 2026-08 and
+2026-09-17, on one machine (Apple silicon, macOS 27.0), and is the specification sake's build
+has to satisfy rather than a report on its behaviour.* sake built the nine components below and
+then Wine itself, configure, the soname rewrite, make and install: 4m40s for Wine on ten cores,
+and 1.1 GB of engine (sake, 2026-09-19). What a game then needs from that engine is in
+[runtime.md](runtime.md).
 
 ## Why CrossOver's sources and not upstream Wine
 
@@ -37,7 +36,7 @@ produced:
 | gmp, nettle, libtasn1 | static, underneath gnutls |
 | gnutls | without TLS the Battle.net client cannot log in |
 | freetype | no fonts at all without it |
-| SDL2 | no game controller works without it — see `runtime.md` |
+| SDL2 | no game controller works without it — see [runtime.md](runtime.md#controllers-need-sdl2) |
 | MoltenVK | Chromium's GPU process dies with no Vulkan driver |
 
 Notes that cost time to find:
@@ -64,8 +63,8 @@ repository's MIT. Four are upstream Wine commits carried only until the CrossOve
 sake builds catch up — two of the winemac.drv ones with wine-11.11, the winhttp ones with
 wine-11.4 and wine-11.7 — one is the reference implementation attached to Wine bug 60263,
 and the rest are sake's own; each file's header says which it is and where it came from.
-What each one is for, and how to tell that it worked, is in `runtime.md`; why they are a
-separate directory is in `licensing.md`.
+What each one is for, and how to tell that it worked, is in [runtime.md](runtime.md); why they
+are a separate directory is in [licensing.md](licensing.md#wine-and-the-patches).
 
 They are applied to the unpacked source tree, so the build has one step that is not out of
 tree. Whether a patch is already in is asked of `patch` itself — a patch that reverses
@@ -102,26 +101,23 @@ game, and that is a long way downstream of here.
 **An engine built from other patches is built again.** After `verify`, the build records a
 hash of every patch's name and contents in `lib/wine/sake-patches.sha256`, and the Wine step
 counts as done only while `bin/wine` is there and that hash is the one of the patches
-Sake.app carries, as the GDK runtime's step does with its source (`gdk.md`). An engine with
-another hash, or with none because an earlier sake built it, leaves the step to do again:
-the library's sidebar says so, and the step says which of the two it is. Building again
-unpacks CrossOver's tree afresh from its archive in `dl/` before patching, because a patch
-that changed or went cannot be taken back off a tree that has it; with no archive there, the
-tree is patched as it is, which is enough for a patch that was only added. It is a full
-build rather than an incremental one: measured at 4m24s on 2026-09-19, no cheaper than the
-first. Two copies of sake that carry different patches each take the other's engine for one
-to build again; only a development build run beside a release does that. Until 2026-09-30
-this said an engine that is already built does not pick a new patch up, and that changing
-one meant deleting `bin/wine` by hand.
+Sake.app carries, as the GDK runtime's step does with its source ([gdk.md](gdk.md#the-runtime)).
+An engine with another hash, or with none because an earlier sake built it, leaves the step to
+do again: the library's sidebar says so, and the step says which of the two it is. Building
+again unpacks CrossOver's tree afresh from its archive in `dl/` before patching, because a
+patch that changed or went cannot be taken back off a tree that has it; with no archive there,
+the tree is patched as it is, which is enough for a patch that was only added. It is a full
+build rather than an incremental one, no cheaper than the first: 4m24s (sake, 2026-09-19). Two
+copies of sake that carry different patches each take the other's engine for one to build
+again; only a development build run beside a release does that.
 
-Measured in sake on 2026-09-30, on an engine built with all nine patches before sake
-recorded them: the wizard stayed shut and the sidebar said Setup needs attention; the Wine
-step, opened from there, gave the reason for an engine with no record. Build unpacked the
-archive and applied all nine patches to the fresh tree within five seconds, none of them
-found already in, and the whole step took 5m01s (4m17s when run again with the record
-removed). D3DMetal's step was then unfinished with its row at waiting, and one press put
-Apple's four DLLs back, each hashing as before. On the rebuilt engine Minecraft Dungeons II
-reached character select in the `ex` bottle.
+On an engine built with all nine patches before sake recorded them, the wizard stayed shut and
+the sidebar said Setup needs attention; the Wine step, opened from there, gave the reason for an
+engine with no record. Build unpacked the archive and applied all nine patches to the fresh tree
+within five seconds, none of them found already in, and the whole step took 5m01s (4m17s when
+run again with the record removed). D3DMetal's step was then unfinished with its row at waiting,
+and one press put Apple's four DLLs back, each hashing as before. On the rebuilt engine
+Minecraft Dungeons II reached character select in the `ex` bottle (sake, 2026-09-30).
 
 ## configure flags that must not be removed
 
@@ -158,26 +154,20 @@ clang is *not* required; the Mach-O side builds with stock Apple clang.
 - **`make install` overwrites D3DMetal.** It puts Wine's own `d3d10`/`d3d11`/`d3d12`/`dxgi.dll`
   back, so installing D3DMetal has to happen *after* every `make install`, not once. sake keeps
   its own copy of Apple's `redist/lib`, so putting it back is one press and does not need the
-  toolkit mounted again. Nothing re-runs it on its own; what the code does is stop claiming
-  the step is finished, so the wizard sends the user there.
+  toolkit mounted again. Nothing re-runs it on its own; the D3DMetal step stops claiming to be
+  finished, so setup sends the user there.
 
-  This section used to say that deleting the whole engine was the only way to re-run `make
-  install`, so D3DMetal went with it and the next install put it back. That is wrong.
-  Measured in sake on 2026-09-19: deleting `engine/bin/wine` alone is enough to make the
-  wizard rebuild, and afterwards all four DLLs were Wine's — while the D3DMetal step still
-  read **"already installed"**, because it asked whether the framework was there and the
-  framework is what `make install` does not touch. Silent, and the engine it left could not
-  run a DX12 game.
-
-  **`isInstalled` now asks whether the four DLLs are Apple's**, which is the question
-  `verify()` had been asking all along, so a Wine rebuild drops the D3DMetal step back to
-  unfinished and the wizard opens on it. Measured the same day, on the real engine and
-  through the app: with one DLL swapped for Wine's own the wizard opened on D3DMetal and
-  its row read "waiting", and one press put the engine back.
+  **The step asks whether the four DLLs are Apple's, not whether the framework is there**,
+  because the framework is what `make install` does not touch. Asking about the framework is
+  silent and wrong: after a rebuild, which deleting `engine/bin/wine` alone is enough to cause,
+  all four DLLs were Wine's while the step still read **"already installed"**, and the engine it
+  left could not run a DX12 game (sake, 2026-09-19). With `isInstalled` asking what `verify()`
+  asks, one DLL swapped for Wine's own made the wizard open on D3DMetal with its row at
+  "waiting", and one press put the engine back (sake, 2026-09-19).
 - **Sonames must not be leaf names.** A leaf name resolves only through
   `DYLD_LIBRARY_PATH`, and that does not reach Wine's child processes. sake rewrites the
   four in `include/config.h` to `@loader_path`-relative paths between configure and make;
-  see `layout.md`.
+  see [layout.md](layout.md#relocatability).
 - **`include/` is generated by a make of its own before anything else is compiled.**
   makedep works out what a widl-generated header includes from its IDL's own `import` and
   `cpp_quote` lines, and drops an `#include "x.idl"` there (`parse_file` in
@@ -208,7 +198,7 @@ clang is *not* required; the Mach-O side builds with stock Apple clang.
 
 ### The wrapping no longer works with the Command Line Tools alone
 
-Measured in sake on 2026-09-19 (CLT 27.0, macOS 27.0). This one is not the prototype's.
+*Measured in sake on 2026-09-19 (CLT 27.0, macOS 27.0).*
 
 `/usr/bin/make` and `/usr/bin/clang` are universal, but they are xcode-select shims that
 `dlopen` `libxcrun.dylib` — and that library ships arm64 and arm64e only. The real binaries
@@ -239,9 +229,7 @@ compiler goes on PATH.
 
 ### Only what ends up inside Wine is x86_64
 
-Measured in sake on 2026-09-19. This corrects an earlier claim here that all nine landed as
-x86_64 and that "the two that produce executables run". They do run — just not inside a Wine
-build.
+*Measured in sake on 2026-09-19.*
 
 `bison` and `pkgconf` are build tools. Wine neither links nor `dlopen`s what they produce,
 so nothing requires them to match Wine's architecture; the prototype had them x86_64 only
@@ -262,7 +250,9 @@ them. bison and pkgconf are native.
 
 ### The PE compiler leads the system, and `CC` is absolute
 
-Measured in sake on 2026-09-19. llvm-mingw ships a bare `clang` and `clang++` beside its
+*Measured in sake on 2026-09-19.*
+
+llvm-mingw ships a bare `clang` and `clang++` beside its
 `x86_64-w64-mingw32-*` ones, and the two halves of a Wine build disagree about which clang
 the name `clang` should mean.
 

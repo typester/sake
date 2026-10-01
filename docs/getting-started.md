@@ -8,7 +8,7 @@ Diablo IV on an Apple silicon Mac, from nothing installed to a character on scre
 - macOS 15 or newer, and the Xcode Command Line Tools — `xcode-select --install`.
 - Apple's Game Porting Toolkit `.dmg` — **4.0 beta 2**, which is what the engine here is built
   against — from <https://developer.apple.com/download/all/>. A free Apple ID is enough. sake
-  cannot fetch this for you; `docs/licensing.md` says why.
+  cannot fetch this for you; [licensing.md](licensing.md) says why.
 - A Battle.net account that owns Diablo IV, and Blizzard's installer for the client. sake does
   not fetch that either.
 - About 10 GB free for sake, and about 90 GB more for the game.
@@ -104,8 +104,8 @@ instead. It clones the game rather than copying it, so it costs no disk.
 themselves. **Add**.
 
 **Leave the arguments alone.** Without `--in-process-gpu` the login form is drawn but never
-appears, and without the two ANGLE flags the client's GPU process exits. `docs/runtime.md` has
-the measurements.
+appears, and without the two ANGLE flags the client's GPU process exits.
+[runtime.md](runtime.md#three-settings-every-run-needs) has the measurements.
 
 ## 5. Install the game
 
@@ -129,5 +129,4 @@ Nothing to set up. The engine is built with SDL2, so a controller should work.
 - Every run writes a log under `~/Library/Caches/Sake/build` — `title-<id>.log` for a title,
   `install-<name>.log` for an installer. The window shows only the last line of it.
 - **Wine Tools** on the bottle opens winecfg, regedit, the uninstaller and the task manager.
-- `docs/runtime.md` tells four failure states apart by thread count, memory and Metal mappings.
-  Read that before deciding a build is broken.
+- [Troubleshooting](troubleshooting.md) has what to try next.
