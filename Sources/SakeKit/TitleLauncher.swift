@@ -37,7 +37,7 @@ public struct TitleLauncher: Sendable {
         self.title = title
     }
 
-    public var logURL: URL { paths.build.appending(path: "title-\(title.id).log") }
+    public var logURL: URL { bottle.logs.appending(path: "title-\(title.id).log") }
 
     public var missingPrerequisite: String? {
         guard bottle.exists else {
@@ -73,7 +73,7 @@ public struct TitleLauncher: Sendable {
                 do {
                     if let missing = missingPrerequisite { throw LaunchError.notReady(missing) }
                     try FileManager.default.createDirectory(
-                        at: paths.build, withIntermediateDirectories: true
+                        at: bottle.logs, withIntermediateDirectories: true
                     )
                     let log = try LogFile(at: logURL)
                     defer { log.close() }

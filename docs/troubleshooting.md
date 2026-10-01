@@ -5,15 +5,15 @@ What to do when something goes wrong. Whether a game is known to run at all is i
 
 ## First, read the log
 
-Every run writes a log in `~/Library/Caches/Sake/build`, and sake's window shows only its last
-line:
+Every run writes a log, and sake's window shows only its last line. What runs in a bottle writes
+it in `~/Library/Caches/Sake/build/bottles`, in a folder named after the bottle:
 
 - `title-<id>.log` for a title
 - `install-<name>.log` for an installer
 - `tool-<name>.log` for one of Wine's tools
 
-The names do not include the bottle yet, so a run in one bottle overwrites the log of the same
-title or installer in another ([#14](https://github.com/typester/sake/issues/14)).
+Setup's builds, and making or importing a bottle, write theirs in `~/Library/Caches/Sake/build`
+itself.
 
 **Wine Tools**, on a bottle, opens Wine's own winecfg, regedit, uninstaller and task manager in
 that bottle.

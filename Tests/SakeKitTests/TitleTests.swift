@@ -24,7 +24,9 @@ private let battleNet = Title(
 
 /// An engine whose `wine` and `wineserver` record how they were called, and a bottle with
 /// the title installed in it.
-private func makeEngineAndBottle(_ paths: Paths, installing title: Title? = battleNet) throws {
+private func makeEngineAndBottle(
+    _ paths: Paths, named name: String = Bottle.defaultName, installing title: Title? = battleNet
+) throws {
     let bin = paths.engine.appending(path: "bin")
     try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
 
@@ -51,7 +53,7 @@ private func makeEngineAndBottle(_ paths: Paths, installing title: Title? = batt
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
     }
 
-    let bottle = Bottle(paths: paths)
+    let bottle = Bottle(paths: paths, name: name)
     try FileManager.default.createDirectory(at: bottle.url, withIntermediateDirectories: true)
     try Data().write(to: bottle.systemRegistry)
 
@@ -146,6 +148,26 @@ private func collect(_ stream: AsyncStream<LaunchEvent>) async -> [LaunchEvent] 
 
     let log = try String(contentsOf: launcher.logURL, encoding: .utf8)
     #expect(log.contains("=== launch Battle.net.exe --use-gl=angle"))
+}
+
+@Test func theSameTitleInTwoBottlesLeavesALogInEach() async throws {
+    let paths = temporaryRoot()
+    defer { remove(paths) }
+    // A title's id is unique only within its bottle: on 2026-09-29 `default` and `ex` both had
+    // a `steam`, and a run in one emptied the other's log.
+    try makeEngineAndBottle(paths)
+    try makeEngineAndBottle(paths, named: "ex")
+
+    let here = TitleLauncher(paths: paths, title: battleNet)
+    let there = TitleLauncher(paths: paths, name: "ex", title: battleNet)
+    _ = await collect(here.launch())
+    _ = await collect(there.launch())
+
+    #expect(here.logURL != there.logURL)
+    for launcher in [here, there] {
+        let log = try String(contentsOf: launcher.logURL, encoding: .utf8)
+        #expect(log.contains("=== launch Battle.net.exe"))
+    }
 }
 
 @Test func aStartPutsTheRuntimeInTheBottleWhateverTheTitle() async throws {

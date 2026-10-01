@@ -33,6 +33,9 @@ measured in sake.*
                                              readable by them alone — see gdk.md
 ~/Library/Caches/Sake/
     dl/ sources/ toolchain/ build/           downloads and build intermediates, ~4 GB
+    build/bottles/<name>/                    the last log of each title, installer and
+                                             Wine tool run in that bottle; a rename leaves
+                                             them under the old name
     d3dmetal/                                Apple's redist/lib, kept so that the image
                                              need not stay mounted — see licensing.md
 ```

@@ -43,7 +43,7 @@ public struct InstallerRunner: Sendable {
     }
 
     public var logURL: URL {
-        paths.build.appending(path: "install-\(installer.deletingPathExtension().lastPathComponent).log")
+        bottle.logs.appending(path: "install-\(installer.deletingPathExtension().lastPathComponent).log")
     }
 
     public var missingPrerequisite: String? {
@@ -79,7 +79,7 @@ public struct InstallerRunner: Sendable {
                 do {
                     if let missing = missingPrerequisite { throw InstallError.notReady(missing) }
                     try FileManager.default.createDirectory(
-                        at: paths.build, withIntermediateDirectories: true
+                        at: bottle.logs, withIntermediateDirectories: true
                     )
                     let log = try LogFile(at: logURL)
                     defer { log.close() }

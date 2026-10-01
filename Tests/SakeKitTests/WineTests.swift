@@ -473,6 +473,6 @@ private func changePatch(in paths: Paths, inserting line: String) throws {
         #expect(command.workingDirectory?.lastPathComponent == "drive_c")
         // `arch` would strip every DYLD_* variable, and wine is x86_64 already.
         #expect(command.architecture == .native)
-        #expect(tool.logURL(in: paths).lastPathComponent == "tool-\(tool.rawValue).log")
+        #expect(tool.logURL(in: bottle) == bottle.logs.appending(path: "tool-\(tool.rawValue).log"))
     }
 }

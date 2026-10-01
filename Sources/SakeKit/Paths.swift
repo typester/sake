@@ -37,6 +37,10 @@ public struct Paths: Sendable, Equatable {
     public var toolchain: URL { cache.appending(path: "toolchain") }
     public var build: URL { cache.appending(path: "build") }
 
+    /// The logs of what runs in one bottle. A directory, not the bottle's name in each file's:
+    /// a name is free text, and `games` + `old-steam` would be `games-old` + `steam`.
+    public func bottleLogs(named name: String) -> URL { build.appending(path: "bottles").appending(path: name) }
+
     /// Wine is built out of tree, which leaves its unpacked source as it came out of the
     /// tarball -- the only copy sake has of it.
     public var wineBuild: URL { build.appending(path: "wine") }
