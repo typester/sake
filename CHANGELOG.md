@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.0](https://github.com/typester/sake/compare/v0.1.2...v0.2.0) (2026-10-01)
+
+
+### Features
+
+* run GDK titles with a runtime and an Xbox sign-in of sake's own, because Wine has no Gaming Services and they will not start without it ([#16](https://github.com/typester/sake/issues/16)) ([8d9e050](https://github.com/typester/sake/commit/8d9e05049661b96c572bdd743bd703bb3f54ed97))
+
+
+### Bug Fixes
+
+* answer ForceRefresh from the session, because a service refusing every new token had sake sign in every few seconds ([#20](https://github.com/typester/sake/issues/20)) ([d75f646](https://github.com/typester/sake/commit/d75f646fa1839196adaaecc90449fc57822c926b))
+* leave macOS's AppleDouble files out of directory listings, because on exFAT a game read one as its settings ([#18](https://github.com/typester/sake/issues/18)) ([3551d01](https://github.com/typester/sake/commit/3551d0136186a70dc3ad3aa755475e0c52933f97))
+* mint PlayFab's token from the same user token as the rest, because under another user hash linking failed ([#19](https://github.com/typester/sake/issues/19)) ([dd4f885](https://github.com/typester/sake/commit/dd4f88527a43091c2abedc8ba6dc5d3aaeb80f41))
+* send an engine built from other patches back to its step, because a new patch never reached an engine already built ([#21](https://github.com/typester/sake/issues/21)) ([902cf5c](https://github.com/typester/sake/commit/902cf5cac2c1fd7b8050ca665ed96fe54398a99d))
+
 ## [0.1.2](https://github.com/typester/sake/compare/v0.1.1...v0.1.2) (2026-09-28)
 
 
