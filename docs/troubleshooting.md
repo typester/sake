@@ -83,9 +83,7 @@ the Switch Pro Controller's, so a controller should work. If yours is not seen, 
 ## After you quit
 
 - **The Dock still shows sake after it has quit.** Something sake started is still running.
-  **Stop** on a title takes down everything in its bottle, not only the game. In a bottle that
-  is a symlink to another disk, Stop does not find what runs there
-  ([#15](https://github.com/typester/sake/issues/15)).
+  **Stop** on a title takes down everything in its bottle, not only the game.
 
 ## Removing sake
 

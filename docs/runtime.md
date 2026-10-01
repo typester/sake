@@ -521,9 +521,7 @@ rather than an assumption of success. Stopping the `wine` sake started is not en
 `Agent.exe` runs with ppid 1, wineserver is its own daemon, and Battle.net keeps a fistful of
 CEF helpers (prototype). `wineserver -k` alone leaves the prefix's own services running, `ps`
 cannot say which prefix a process belongs to, and the directory wineserver keeps its socket in
-can. It finds nothing in a bottle that is a symlink: `Bottle.serverDirectory`
-reads the link's own inode rather than the prefix's
-([#15](https://github.com/typester/sake/issues/15)).
+can.
 
 **`wineserver -k` leaves the prefix's own services behind.** A title was started from the
 library and stopped again: `wineserver -k` took down the game and the server, and then these
@@ -565,3 +563,13 @@ else: the clients hold the server's `tmpmap-*` shared memory open, so they are s
 **after the server itself is gone** (sake, 2026-09-20). An inode does not change when a
 directory is renamed, so this identifies a bottle's processes across a rename; and it is per
 prefix, so nothing here can reach a CrossOver bottle or another of sake's.
+
+**A bottle that is a symlink is named by what the link points at.** Wine `chdir`s into
+`WINEPREFIX` and stats `.`, in ntdll and wineserver alike (read in CrossOver 26.3.0's
+sources, 2026-10-01), while `FileManager.attributesOfItem` describes a link itself, so
+reading the bottle's own path with it names a directory that never exists. In the `ex`
+bottle, a link to a directory on an exFAT disk, the link is `1000012-8fa3a84` and the
+server's directory `server-1000016-116a1`. Through the link's own inode, Stop killed
+wineserver and left nineteen processes running with ppid 1 (sake, 2026-09-29); through its
+target, the sequence Stop runs found eighteen there with Steam up, wineserver and seven
+`steamwebhelper.exe` among them, and left none (sake, 2026-10-01).
