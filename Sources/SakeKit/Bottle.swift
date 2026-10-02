@@ -151,7 +151,11 @@ public struct Bottle: Sendable, Equatable {
     /// and because it is an inode it survives the bottle being renamed. Measured against a
     /// live prefix on 2026-09-20; see docs/runtime.md.
     public var serverDirectory: URL? {
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+        // Resolved first: Wine `chdir`s into the prefix and stats `.`, so a bottle that is a
+        // symlink is named by its target, and `attributesOfItem` describes the link itself.
+        guard let attributes = try? FileManager.default.attributesOfItem(
+                  atPath: url.resolvingSymlinksInPath().path
+              ),
               let device = attributes[.systemNumber] as? Int,
               let inode = attributes[.systemFileNumber] as? Int
         else { return nil }

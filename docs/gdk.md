@@ -59,11 +59,10 @@ An installer is given it too, because Steam's can start Steam as it finishes, an
 installed in that Steam never passes through sake's Play; that has not been tried. A copy is
 written beside the one it replaces and renamed over it, so nothing ever reads half a DLL. On
 APFS a game that has the old one loaded keeps it; on exFAT, where the `ex` bottle is, what that
-rename does under a running game has not been measured, and sake cannot yet see what runs in a
-symlinked bottle ([#15](https://github.com/typester/sake/issues/15)) to wait for it. The engine
-is one per Mac, so two copies of sake that carry different runtime source each take the other's
-build for stale and build their own again; only a development build run beside a release does
-that.
+rename does under a running game has not been measured, and sake does not check what is running
+in the bottle before it replaces the copy. The engine is one per Mac, so two copies of sake that
+carry different runtime source each take the other's build for stale and build their own again;
+only a development build run beside a release does that.
 
 **libHttpClient is pinned by what it unpacks to.** The step fetches it itself rather than with
 the other sources, so that nothing else in setup waits on it. GitHub's page on downloading

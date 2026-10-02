@@ -490,6 +490,27 @@ private func trash(in paths: Paths) -> (can: URL, trash: Trash) {
     #expect(renamed.serverDirectory?.path == expected)
 }
 
+@Test func aBottleThatIsASymlinkIsNamedByThePrefixItPointsAt() throws {
+    let paths = temporaryRoot()
+    defer { remove(paths) }
+
+    // The `ex` bottle on 2026-09-29: a link in bottles/ to a prefix on another disk. Wine
+    // names the socket directory after the prefix, and the link's own inode names one that
+    // never exists, so Stop found nothing to stop.
+    let prefix = paths.root.appending(path: "elsewhere/ex")
+    try FileManager.default.createDirectory(at: prefix, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: paths.bottles, withIntermediateDirectories: true)
+    let bottle = Bottle(paths: paths, name: "ex")
+    try FileManager.default.createSymbolicLink(at: bottle.url, withDestinationURL: prefix)
+
+    let attributes = try FileManager.default.attributesOfItem(atPath: prefix.path)
+    let device = attributes[.systemNumber] as! Int
+    let inode = attributes[.systemFileNumber] as! Int
+    let expected = "/tmp/.wine-\(getuid())/server-"
+        + String(device, radix: 16) + "-" + String(inode, radix: 16)
+    #expect(bottle.serverDirectory?.path == expected)
+}
+
 @Test func aPrefixThatIsNotThereHasNoProcessesAndNothingToKill() async throws {
     let paths = temporaryRoot()
     defer { remove(paths) }

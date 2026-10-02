@@ -98,9 +98,7 @@ easier to read than it was interleaved with `configure` flags.
   through its socket directory ([runtime.md](runtime.md#taking-a-bottle-down)), but the guard
   that refuses to rename a bottle with a game in it still asks what sake started, so it is
   narrower than it needs to be. A wineserver one of Wine's tools started is not something it
-  knows about, so running winecfg does not refuse a rename the way a running game does. In a
-  bottle that is a symlink the socket directory is not found at all
-  ([#15](https://github.com/typester/sake/issues/15)).
+  knows about, so running winecfg does not refuse a rename the way a running game does.
 - **`AppModel` has quietly become where decisions live, and the tests cannot reach it.** Whether
   a bottle may be renamed, which run a title's status belongs to, which variable names a title
   may not set (`typedEnvironment()`), and what to forget after an uninstall are all judgements,
