@@ -62,6 +62,7 @@ public struct Bottle: Sendable, Equatable {
 
     public var url: URL { paths.bottle(named: name) }
     public var engine: URL { paths.engine }
+    public var logs: URL { paths.bottleLogs(named: name) }
 
     public var driveC: URL { url.appending(path: "drive_c") }
     public var system32: URL { driveC.appending(path: "windows/system32") }

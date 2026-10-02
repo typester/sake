@@ -30,17 +30,17 @@ public enum WineTool: String, CaseIterable, Sendable, Identifiable {
         bottle.command("wine", [rawValue], workingDirectory: bottle.driveC)
     }
 
-    public func logURL(in paths: Paths) -> URL {
-        paths.build.appending(path: "tool-\(rawValue).log")
+    public func logURL(in bottle: Bottle) -> URL {
+        bottle.logs.appending(path: "tool-\(rawValue).log")
     }
 
     /// Started and then left alone: these are windows somebody closes themselves, so there
     /// is nothing to report progress on and nothing to wait for.
     public func start(in bottle: Bottle, runner: ProcessRunner = ProcessRunner()) async {
         try? FileManager.default.createDirectory(
-            at: bottle.paths.build, withIntermediateDirectories: true
+            at: bottle.logs, withIntermediateDirectories: true
         )
-        let log = try? LogFile(at: logURL(in: bottle.paths))
+        let log = try? LogFile(at: logURL(in: bottle))
         defer { log?.close() }
         _ = try? await runner.run(command(in: bottle)) { line in log?.write(line.text + "\n") }
     }

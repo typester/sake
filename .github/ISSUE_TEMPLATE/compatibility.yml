@@ -56,5 +56,5 @@ body:
     id: log
     attributes:
       label: Log
-      description: If it did not work, the title's log from `~/Library/Caches/Sake/build/` (`title-<name>.log`). Paths in it show your macOS user name.
+      description: If it did not work, the title's log from `~/Library/Caches/Sake/build/bottles/<bottle>/` (`title-<name>.log`). Paths in it show your macOS user name.
       render: text

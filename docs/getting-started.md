@@ -126,7 +126,8 @@ Nothing to set up. The engine is built with SDL2, so a controller should work.
 
 ## If it does not start
 
-- Every run writes a log under `~/Library/Caches/Sake/build` — `title-<id>.log` for a title,
+- Starting a title or an installer writes a log under
+  `~/Library/Caches/Sake/build/bottles/default` — `title-<id>.log` for a title,
   `install-<name>.log` for an installer. The window shows only the last line of it.
 - **Wine Tools** on the bottle opens winecfg, regedit, the uninstaller and the task manager.
 - [Troubleshooting](troubleshooting.md) has what to try next.

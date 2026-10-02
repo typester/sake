@@ -127,7 +127,7 @@ private func collect(_ stream: AsyncStream<InstallEvent>) async -> [InstallEvent
     let log = try String(contentsOf: runner.logURL, encoding: .utf8)
     #expect(log.contains("=== install \(installer.path)"))
     #expect(log.contains("installing"))
-    #expect(runner.logURL.lastPathComponent == "install-Setup.log")
+    #expect(runner.logURL == Bottle(paths: paths).logs.appending(path: "install-Setup.log"))
 }
 
 @Test func whatCannotBeInstalledIsSaidRatherThanAttempted() async throws {
