@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/typester/sake/compare/v0.2.0...v0.2.1) (2026-10-02)
+
+
+### Bug Fixes
+
+* find what runs in a symlinked bottle by what the link points at, because Stop killed only its wineserver ([#23](https://github.com/typester/sake/issues/23)) ([16cc4f2](https://github.com/typester/sake/commit/16cc4f2933704e5acbb2089261afd308326c09b7))
+* log what runs in each bottle to a directory of its own, because the same title in two bottles shared one log ([#24](https://github.com/typester/sake/issues/24)) ([ca8f5f7](https://github.com/typester/sake/commit/ca8f5f716eab51fc95aa60ca074498db0c75e4a3))
+
 ## [0.2.0](https://github.com/typester/sake/compare/v0.1.2...v0.2.0) (2026-10-01)
 
 
