@@ -75,6 +75,15 @@ that bottle.
 - **Wine's own settings**, such as the Windows version, DLL overrides, drives and the audio
   device, are in winecfg, under Wine Tools. Changing the Windows version can break a game.
 
+## Video
+
+- **A game plays a video's sound and shows no picture.** sake builds Wine without GStreamer,
+  and Wine hands MP4 parsing and H.264 decoding to it, so Media Foundation refuses the file. A
+  Unity title's `Player.log` says `WindowsVideoMedia error 0xc00d36c4 ... Unsupported bytestream
+  type`. Forever Ago's TV scene did this (sake, 2026-11-25). It is not fixed in sake. A Wine
+  built with GStreamer 1.28.9 from its macOS package decoded that game's clip in a test program
+  that read it through Media Foundation; that it plays inside the game was not checked.
+
 ## Controllers
 
 Nothing to set up. The engine is built with SDL2, which knows device-specific protocols such as
