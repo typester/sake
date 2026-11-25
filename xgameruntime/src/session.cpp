@@ -124,6 +124,14 @@ size_t Payload::Size() const noexcept
         return sizeof(TokenData) + token.size() + 1;
     case Kind::TokenUtf16:
         return sizeof(TokenDataUtf16) + Utf16Length(token) * sizeof(wchar_t);
+    case Kind::Value:
+        return sizeof(value);
+    case Kind::Blobs: {
+        size_t size = blobs.size() * sizeof(XGameSaveBlob) + sizeof(uint32_t);
+        for (const auto& blob : blobs)
+            size += blob.first.size() + 1 + blob.second.size();
+        return size;
+    }
     default:
         return 0;
     }
@@ -151,6 +159,26 @@ void Payload::Write(void* buffer) const noexcept
         if (MultiByteToWideChar(CP_UTF8, 0, token.c_str(), -1, text, static_cast<int>(length)) == 0)
             text[0] = L'\0';
         *data = {length * sizeof(wchar_t), 0, text, nullptr};
+        break;
+    }
+    case Kind::Value:
+        memcpy(buffer, &value, sizeof(value));
+        break;
+    case Kind::Blobs: {
+        auto* array = static_cast<XGameSaveBlob*>(buffer);
+        char* cursor = reinterpret_cast<char*>(array + blobs.size());
+        for (size_t i = 0; i < blobs.size(); ++i) {
+            const auto& [name, data] = blobs[i];
+            memcpy(cursor, name.c_str(), name.size() + 1);
+            array[i].info = {cursor, static_cast<uint32_t>(data.size())};
+            cursor += name.size() + 1;
+            if (!data.empty())
+                memcpy(cursor, data.data(), data.size());
+            array[i].data = reinterpret_cast<uint8_t*>(cursor);
+            cursor += data.size();
+        }
+        uint32_t count = static_cast<uint32_t>(blobs.size());
+        memcpy(cursor, &count, sizeof(count));
         break;
     }
     default:

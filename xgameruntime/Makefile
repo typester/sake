@@ -9,7 +9,7 @@ LIBHTTPCLIENT ?= $(error LIBHTTPCLIENT must name an unpacked libHttpClient tree)
 OUT ?= ../target/xgameruntime
 
 TASK = AsyncLib TaskQueue ThreadPool_win32 WaitTimer_win32
-OWN = log main threading system networking user signin session
+OWN = log main threading system networking user signin session gamesave
 
 # libHttpClient is compiled by absolute path, and its __FILE__ would put that path, with the
 # person's home in it, into the copy in every bottle.

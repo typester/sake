@@ -58,6 +58,8 @@ Class g_classes[] = {
     {kXUserClass, {&kXUser, &kXUserGamertag}, {}},
     {kXUserDeviceClass, {&kXUserDevice}, {}},
     {kXGameClass, {&kXGame}, {}},
+    {kXPackageClass, {&kXPackage}, {}},
+    {kXGameSaveClass, {&kXGameSave}, {}},
     {kRegistration0651aae2Class, {&kRegistration0651aae2}, {}},
     {kRegistration95fd18d2Class, {&kRegistration95fd18d2}, {}},
 };
