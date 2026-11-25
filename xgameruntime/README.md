@@ -28,6 +28,7 @@ vtable, and releases it.
 | XSystem, XSystemAnalytics | sandbox `RETAIL`; the rest minimal |
 | XNetworking | online, unmetered, with the initial notification to each registration for changes; TLS 1.2 and no pinned certificates for every URL |
 | XGame | the title ID from the title's `MicrosoftGame.config` |
+| XPackage | `IsPackagedProcess` (false) and `GetUserLocale` (the user's locale name); the other slots are refused as not implemented |
 | XGameProtocol, XGameInvite | registrations accepted, never fired |
 | XUser, XUserGamertag, XUserDevice | one user: the session's person, or a placeholder until the first token request asks sake; one `SignedInAgain` after the silent add; tokens by host from the session, unsigned; no gamer picture and no devices |
 
