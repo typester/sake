@@ -87,11 +87,34 @@ struct XUserLocalId {
 
 // What an XUser call hands back once it completes: nothing, the user's handle, or a token
 // laid out the way XUserGetTokenAndSignatureData, or its UTF-16 twin, lays one out.
+// What XGameSave hands back, laid out as Microsoft's reference gives them.
+struct XGameSaveBlobInfo {
+    const char* name;
+    uint32_t size;
+};
+struct XGameSaveBlob {
+    XGameSaveBlobInfo info;
+    uint8_t* data;
+};
+struct XGameSaveContainerInfo {
+    const char* name;
+    const char* displayName;
+    uint32_t blobCount;
+    uint64_t totalSize;
+    int64_t lastModifiedTime;
+    bool needsSync;
+};
+static_assert(sizeof(XGameSaveBlob) == 24);
+static_assert(sizeof(XGameSaveContainerInfo) == 48);
+
 struct Payload {
-    enum class Kind { None, User, Token, TokenUtf16 };
+    enum class Kind { None, User, Token, TokenUtf16, Value, Blobs };
     Kind kind = Kind::None;
     XUserHandle user = nullptr;
     std::string token;
+    uint64_t value = 0;
+    // Written as an XGameSaveBlob array, then each name and its data, then the count.
+    std::vector<std::pair<std::string, std::vector<uint8_t>>> blobs;
 
     size_t Size() const noexcept;
     void Write(void* buffer) const noexcept;
@@ -370,6 +393,7 @@ extern const Object kXUserGamertag;
 extern const Object kXUserDevice;
 extern const Object kXGame;
 extern const Object kXPackage;
+extern const Object kXGameSave;
 extern const Object kRegistration0651aae2;
 extern const Object kRegistration95fd18d2;
 

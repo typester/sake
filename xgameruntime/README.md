@@ -29,6 +29,7 @@ vtable, and releases it.
 | XNetworking | online, unmetered, with the initial notification to each registration for changes; TLS 1.2 and no pinned certificates for every URL |
 | XGame | the title ID from the title's `MicrosoftGame.config` |
 | XPackage | `IsPackagedProcess` (false) and `GetUserLocale` (the user's locale name); the other slots are refused as not implemented |
+| XGameSave | connected storage kept as files in the bottle, under the title's folder in `AppData/Local/Sake`: a directory per container, a file per blob, an update written to temporary files and then renamed over them; no sync, a quota of 256 MiB; XGameSaveFiles refused |
 | XGameProtocol, XGameInvite | registrations accepted, never fired |
 | XUser, XUserGamertag, XUserDevice | one user: the session's person, or a placeholder until the first token request asks sake; one `SignedInAgain` after the silent add; tokens by host from the session, unsigned; no gamer picture and no devices |
 

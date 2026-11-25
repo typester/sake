@@ -59,6 +59,7 @@ Class g_classes[] = {
     {kXUserDeviceClass, {&kXUserDevice}, {}},
     {kXGameClass, {&kXGame}, {}},
     {kXPackageClass, {&kXPackage}, {}},
+    {kXGameSaveClass, {&kXGameSave}, {}},
     {kRegistration0651aae2Class, {&kRegistration0651aae2}, {}},
     {kRegistration95fd18d2Class, {&kRegistration95fd18d2}, {}},
 };
