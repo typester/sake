@@ -2,6 +2,7 @@
 #include "guids.h"
 
 #include <cstdlib>
+#include <utility>
 
 namespace sake {
 namespace {
@@ -239,6 +240,55 @@ constexpr XGameVtbl kGameVtbl = {
     .beyond = SAKE_BEYOND(3),
 };
 
+
+// The slot numbers are read from a title's thunks: each XPackage call is at 8 * n bytes into the
+// vtable. Only the two a title asks for while starting are answered.
+constexpr size_t kPackageFirstSlot = 3;
+constexpr size_t kPackageSlots = 38;  // 3 .. 40
+
+template <int Slot>
+HRESULT PackageUnanswered(void* self) noexcept
+{
+    SAKE_TRACE("slot %d not implemented", Slot);
+    return E_NOTIMPL;
+}
+
+bool PackageIsPackagedProcess(void*) noexcept
+{
+    SAKE_TRACE("-> false");
+    return false;
+}
+
+HRESULT PackageGetUserLocale(void*, size_t size, char* locale) noexcept
+{
+    wchar_t wide[LOCALE_NAME_MAX_LENGTH] = {};
+    char name[LOCALE_NAME_MAX_LENGTH] = {};
+    if (GetUserDefaultLocaleName(wide, LOCALE_NAME_MAX_LENGTH) == 0 ||
+        WideCharToMultiByte(CP_UTF8, 0, wide, -1, name, sizeof(name), nullptr, nullptr) == 0)
+        strcpy_s(name, "en-US");
+    SAKE_TRACE("size %zu -> %s", size, name);
+    if (locale == nullptr)
+        return E_POINTER;
+    return CopyString(name, size, locale, nullptr);
+}
+
+struct XPackageVtbl {
+    Unknown unknown;
+    HRESULT (*slots[kPackageSlots])(void*) noexcept;
+    BeyondSlots beyond;
+};
+
+template <size_t... I>
+XPackageVtbl MakePackageVtbl(std::index_sequence<I...>) noexcept
+{
+    XPackageVtbl vtbl = {kUnknown, {PackageUnanswered<static_cast<int>(I + kPackageFirstSlot)>...}, SAKE_BEYOND(41)};
+    vtbl.slots[4 - kPackageFirstSlot] = reinterpret_cast<HRESULT (*)(void*) noexcept>(PackageIsPackagedProcess);
+    vtbl.slots[11 - kPackageFirstSlot] = reinterpret_cast<HRESULT (*)(void*) noexcept>(PackageGetUserLocale);
+    return vtbl;
+}
+
+const XPackageVtbl kPackageVtbl = MakePackageVtbl(std::make_index_sequence<kPackageSlots>{});
+
 // Nothing here ever fires an event, so a registration is a token and nothing else.
 HRESULT Register(void* self, XTaskQueueHandle queue, void*, void*, XTaskQueueRegistrationToken* token) noexcept
 {
@@ -267,6 +317,7 @@ constexpr GUID kErrorIids[] = {kXErrorClass};
 constexpr GUID kSystemIids[] = {kXSystemClass, kXSystem2Iid, kXSystem3Iid, kXSystem4Iid, kXSystem5Iid};
 constexpr GUID kAnalyticsIids[] = {kXSystemAnalyticsClass};
 constexpr GUID kGameIids[] = {kXGameClass, kXGameIid};
+constexpr GUID kPackageIids[] = {kXPackageClass, kXPackageIid};
 constexpr GUID kRegistration0651aae2Iids[] = {kRegistration0651aae2Class};
 constexpr GUID kRegistration95fd18d2Iids[] = {kRegistration95fd18d2Class, kRegistration95fd18d2Iid};
 
@@ -283,6 +334,7 @@ const Object kXError = {&kErrorVtbl, "XError", kErrorIids, std::size(kErrorIids)
 const Object kXSystem = {&kSystemVtbl, "XSystem", kSystemIids, std::size(kSystemIids)};
 const Object kXSystemAnalytics = {&kAnalyticsVtbl, "XSystemAnalytics", kAnalyticsIids, std::size(kAnalyticsIids)};
 const Object kXGame = {&kGameVtbl, "XGame", kGameIids, std::size(kGameIids)};
+const Object kXPackage = {&kPackageVtbl, "XPackage", kPackageIids, std::size(kPackageIids)};
 const Object kRegistration0651aae2 = {&kRegistrationVtbl, "registration 0651aae2", kRegistration0651aae2Iids,
                                       std::size(kRegistration0651aae2Iids)};
 const Object kRegistration95fd18d2 = {&kRegistrationVtbl, "registration 95fd18d2", kRegistration95fd18d2Iids,

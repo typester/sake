@@ -369,6 +369,7 @@ extern const Object kXUser;
 extern const Object kXUserGamertag;
 extern const Object kXUserDevice;
 extern const Object kXGame;
+extern const Object kXPackage;
 extern const Object kRegistration0651aae2;
 extern const Object kRegistration95fd18d2;
 
